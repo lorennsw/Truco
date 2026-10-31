@@ -5,7 +5,7 @@ import { leaveRoom, rematch, sendAction, sit, useStore } from '../store';
 import { CALL_TEXT, actionLabel, pendingText, teamName } from '../texts';
 import { SpanishCard } from './Card';
 import { ChatPanel } from './Chat';
-import { BarTableSurface, BeerSet, CardDeck } from './BarTable';
+import { BarTableSurface, CardDeck } from './BarTable';
 import { setMuted, useAmbientSound, useMuted } from '../ambient';
 import { RulesSummary } from './Rules';
 import { ScoreBoard } from './Score';
@@ -294,13 +294,9 @@ function TableStage({ room, g, seats, fraction, secsLeft }: { room: RoomView; g:
 
   const result = g.phase === 'handOver' ? g.result : null;
 
-  // Objetos decorativos en ángulos donde no hay jugadores (arriba a la derecha y a la izquierda).
-  const free = n === 6 ? [-62, -118] : [-45, -135];
+  // Mazo decorativo en un ángulo donde no hay jugadores (arriba a la izquierda).
   const propRadius = n === 6 ? 0.9 : 0.8;
-  const props = compact && n === 6 ? [] : [
-    { angle: (free[0] * Math.PI) / 180, kind: 'beer' as const },
-    { angle: (free[1] * Math.PI) / 180, kind: 'deck' as const },
-  ];
+  const props = compact && n === 6 ? [] : [{ angle: ((n === 6 ? -118 : -135) * Math.PI) / 180, kind: 'deck' as const }];
   const propSize = Math.round(clamp(Math.min(tw, th * 1.6) * (n === 6 ? 0.036 : 0.048), 20, 46));
 
   return (
@@ -317,7 +313,7 @@ function TableStage({ room, g, seats, fraction, secsLeft }: { room: RoomView; g:
               className="absolute -translate-x-1/2 -translate-y-1/2"
               style={{ left: `${(0.5 + Math.cos(angle) * Rx * propRadius) * 100}%`, top: `${(0.5 + Math.sin(angle) * Ry * propRadius) * 100}%` }}
             >
-              {kind === 'beer' ? <BeerSet size={propSize} /> : <CardDeck size={propSize} />}
+              <CardDeck size={propSize} />
             </div>
           ))}
 
