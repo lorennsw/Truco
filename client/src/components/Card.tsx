@@ -168,14 +168,14 @@ function Rey({ suit }: { suit: Suit }) {
 
 /** Posición (en % de la carta) de cada palo para las cartas del 2 al 7. */
 const PIPS: Record<number, [number, number][]> = {
-  2: [[50, 27], [50, 73]],
-  3: [[50, 22], [50, 50], [50, 78]],
-  4: [[32, 27], [68, 27], [32, 73], [68, 73]],
-  5: [[32, 25], [68, 25], [50, 50], [32, 75], [68, 75]],
-  6: [[32, 22], [68, 22], [32, 50], [68, 50], [32, 78], [68, 78]],
-  7: [[32, 22], [68, 22], [50, 36], [32, 52], [68, 52], [32, 78], [68, 78]],
+  2: [[50, 29], [50, 71]],
+  3: [[50, 26], [50, 50], [50, 74]],
+  4: [[37, 30], [63, 30], [37, 70], [63, 70]],
+  5: [[37, 28], [63, 28], [50, 50], [37, 72], [63, 72]],
+  6: [[37, 27], [63, 27], [37, 50], [63, 50], [37, 73], [63, 73]],
+  7: [[37, 27], [63, 27], [50, 38.5], [37, 50], [63, 50], [37, 73], [63, 73]],
 };
-const PIP_SIZE: Record<number, number> = { 2: 36, 3: 32, 4: 30, 5: 28, 6: 27, 7: 25 };
+const PIP_SIZE: Record<number, number> = { 2: 32, 3: 28, 4: 27, 5: 25, 6: 24, 7: 22 };
 
 function CardFace({ card }: { card: Card }) {
   const n = card.number;
@@ -184,14 +184,14 @@ function CardFace({ card }: { card: Card }) {
     return (
       <svg viewBox="0 0 100 150" className="absolute inset-0 h-full w-full" aria-hidden>
         <ellipse cx="50" cy="75" rx="36" ry="52" fill="none" stroke={SUIT_COLOR[card.suit]} strokeWidth="1.5" strokeDasharray="3 3" opacity="0.6" />
-        <Held suit={card.suit} x={50} y={75} s={card.suit === 'espada' || card.suit === 'basto' ? 92 : 66} />
+        <Held suit={card.suit} x={50} y={75} s={card.suit === 'espada' || card.suit === 'basto' ? 84 : 60} />
       </svg>
     );
   }
   if (n >= 10) {
     const Figure = n === 10 ? Sota : n === 11 ? Caballo : Rey;
     return (
-      <svg viewBox="0 0 100 150" className="absolute inset-[9%_8%] h-[82%] w-[84%]" aria-hidden>
+      <svg viewBox="0 0 100 150" className="absolute inset-x-[12%] inset-y-[11%] h-[78%] w-[76%]" aria-hidden>
         <Figure suit={card.suit} />
       </svg>
     );
@@ -213,72 +213,62 @@ function CardFace({ card }: { card: Card }) {
   );
 }
 
-export type CardSize = 'xs' | 'sm' | 'md' | 'lg';
-const SIZES: Record<CardSize, { box: string; corner: string }> = {
-  xs: { box: 'w-9 h-[3.4rem] rounded-md', corner: 'text-[9px]' },
-  sm: { box: 'w-12 h-[4.5rem] rounded-md', corner: 'text-[10px]' },
-  md: { box: 'w-16 h-24 rounded-lg', corner: 'text-xs' },
-  lg: { box: 'w-[5.2rem] h-[7.8rem] sm:w-24 sm:h-36 rounded-xl', corner: 'text-sm sm:text-base' },
+/** Anchos predefinidos. El alto sale de la proporción 2:3, así la carta nunca se deforma. */
+export type CardSize = 'xs' | 'sm' | 'md' | 'lg' | 'fluid';
+const WIDTH: Record<CardSize, string> = {
+  xs: '34px',
+  sm: '46px',
+  md: '62px',
+  lg: 'clamp(76px, 22vw, 112px)',
+  fluid: '100%',
 };
+
+export type CardState = 'playable' | 'selected' | 'idle' | 'winner' | 'static';
 
 export function SpanishCard({
   card,
   size = 'md',
+  state = 'static',
   onClick,
-  playable,
-  dim,
-  highlight,
   className = '',
   style,
 }: {
   card: Card;
   size?: CardSize;
+  state?: CardState;
   onClick?: () => void;
-  playable?: boolean;
-  dim?: boolean;
-  highlight?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }) {
-  const s = SIZES[size];
   const color = SUIT_COLOR[card.suit];
-  const Tag = onClick ? 'button' : 'div';
+  const interactive = !!onClick;
+  const Tag = interactive ? 'button' : 'div';
+  const stateClass = { playable: 'scard-playable', selected: 'scard-playable scard-selected', idle: 'scard-idle', winner: 'scard-winner', static: '' }[state];
   return (
     <Tag
-      type={onClick ? 'button' : undefined}
+      type={interactive ? 'button' : undefined}
       onClick={onClick}
-      disabled={onClick ? !playable : undefined}
+      disabled={interactive ? state === 'idle' : undefined}
       aria-label={cardLabel(card)}
+      aria-pressed={interactive && state === 'selected' ? true : undefined}
       title={cardLabel(card)}
-      style={{ borderColor: color, ...style }}
-      className={[
-        'relative shrink-0 select-none overflow-hidden border-2 bg-cream text-left shadow-[0_6px_14px_rgba(0,0,0,0.45)] transition duration-150',
-        s.box,
-        playable ? 'cursor-pointer hover:-translate-y-3 hover:shadow-[0_14px_24px_rgba(0,0,0,0.5)] focus-visible:-translate-y-3 focus-visible:outline-3 focus-visible:outline-gold' : '',
-        onClick && !playable ? 'cursor-not-allowed' : '',
-        dim ? 'opacity-55 saturate-50' : '',
-        highlight ? 'ring-4 ring-gold' : '',
-        className,
-      ].join(' ')}
+      style={{ width: WIDTH[size], color, ...style }}
+      className={`scard relative block shrink-0 select-none overflow-hidden p-0 text-left ${stateClass} ${className}`}
     >
-      <span className="pointer-events-none absolute inset-[3px] rounded-[inherit] border border-black/10" />
+      <span className="scard-frame" />
       <CardFace card={card} />
-      <span className={`absolute left-1 top-0.5 font-extrabold leading-none ${s.corner}`} style={{ color }}>
+      <span className="scard-index left-[7%] top-[5%]">
         {card.number}
+        <SuitIcon suit={card.suit} />
       </span>
-      <span className={`absolute bottom-0.5 right-1 rotate-180 font-extrabold leading-none ${s.corner}`} style={{ color }}>
+      <span className="scard-index bottom-[5%] right-[7%] rotate-180">
         {card.number}
+        <SuitIcon suit={card.suit} />
       </span>
     </Tag>
   );
 }
 
 export function CardBack({ size = 'sm', className = '', style }: { size?: CardSize; className?: string; style?: React.CSSProperties }) {
-  return (
-    <div
-      style={style}
-      className={`card-back shrink-0 border-2 border-cream/90 shadow-[0_4px_10px_rgba(0,0,0,0.45)] ${SIZES[size].box} ${className}`}
-      aria-hidden
-    />
-  );
+  return <div style={{ width: WIDTH[size], ...style }} className={`card-back aspect-[2/3] shrink-0 rounded-[9%/6%] ${className}`} aria-hidden />;
 }

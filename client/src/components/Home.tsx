@@ -78,7 +78,7 @@ export function Home() {
           <button
             disabled={!ready || busy}
             onClick={() => run(() => joinRoom(invite))}
-            className="rounded-xl bg-gold px-6 py-3 font-bold text-felt-950 shadow-lg transition hover:brightness-110 disabled:opacity-50"
+            className="btn btn-gold btn-lg"
           >
             {hasName ? 'Entrar a la sala' : 'Escribí tu nombre para entrar'}
           </button>
@@ -125,7 +125,7 @@ export function Home() {
           <button
             disabled={!ready || busy}
             onClick={() => run(() => createRoom({ name: roomName, isPublic, mode, rules }))}
-            className="rounded-xl bg-gold px-6 py-3 text-lg font-bold text-felt-950 shadow-lg transition hover:brightness-110 disabled:opacity-50"
+            className="btn btn-gold btn-lg w-full"
           >
             Crear mesa {MODE_LABEL[mode]}
           </button>
@@ -148,14 +148,14 @@ export function Home() {
                 placeholder="ABC12"
                 className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-2.5 font-mono text-lg uppercase tracking-[0.3em] outline-none focus:border-gold/60"
               />
-              <button disabled={!ready || busy || !code.trim()} className="rounded-xl bg-white/15 px-5 font-bold hover:bg-white/25 disabled:opacity-50">
+              <button disabled={!ready || busy || !code.trim()} className="btn btn-secondary h-auto">
                 Unirse
               </button>
             </form>
             <button
               disabled={!ready || busy}
               onClick={() => run(() => quickJoin())}
-              className="rounded-xl border border-gold/50 px-4 py-2.5 font-semibold text-gold hover:bg-gold/10 disabled:opacity-50"
+              className="btn btn-accent w-full"
             >
               ⚡ Partida rápida (primera mesa pública libre)
             </button>
@@ -188,7 +188,7 @@ export function Home() {
                       <button
                         disabled={!ready || busy}
                         onClick={() => run(() => joinRoom(r.code))}
-                        className="rounded-xl bg-gold px-4 py-2 text-sm font-bold text-felt-950 disabled:opacity-50"
+                        className="btn btn-gold btn-sm"
                       >
                         Entrar
                       </button>
@@ -196,7 +196,7 @@ export function Home() {
                       <button
                         disabled={!ready || busy}
                         onClick={() => run(() => joinRoom(r.code))}
-                        className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                        className="btn btn-secondary btn-sm"
                         title="La partida ya empezó: podés mirar o reemplazar a un bot"
                       >
                         Mirar

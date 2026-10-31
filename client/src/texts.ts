@@ -1,5 +1,4 @@
-import type { Action, CallName, GameEvent, PlayerView, ScoreReason, Team } from '@truco/shared';
-import { cardLabel } from '@truco/shared';
+import type { Action, CallName, PlayerView, ScoreReason, Team } from '@truco/shared';
 
 export const CALL_TEXT: Record<CallName, string> = {
   truco: '¡Truco!',
@@ -17,7 +16,7 @@ export const CALL_TEXT: Record<CallName, string> = {
   mazo: 'Me voy al mazo',
 };
 
-const SCORE_REASON: Record<ScoreReason, string> = {
+export const SCORE_REASON: Record<ScoreReason, string> = {
   mano: 'la mano',
   trucoNoQuerido: 'truco no querido',
   mazo: 'mazo',
@@ -70,30 +69,4 @@ export function pendingText(g: PlayerView): string {
   if (g.pending === 'envido') return g.envido.calls.map((c) => CALL_TEXT[c.kind].replace(/[¡!]/g, '')).join(' + ');
   if (g.pending === 'truco') return ['', '', 'Truco', 'Retruco', 'Vale cuatro'][g.truco.pending!.level];
   return '';
-}
-
-export function eventText(e: GameEvent, name: (seat: number) => string, mySeat: number | null): string | null {
-  const t = (team: Team) => teamName(team, mySeat);
-  switch (e.kind) {
-    case 'newHand':
-      return `— Mano ${e.hand}: es mano ${name(e.mano)} —`;
-    case 'call':
-      return `${name(e.seat)}: ${CALL_TEXT[e.call]}`;
-    case 'play':
-      return `${name(e.seat)} juega el ${cardLabel(e.card)}`;
-    case 'trick':
-      return e.winnerTeam === null ? `Baza ${e.index + 1}: ¡parda!` : `Baza ${e.index + 1} para ${t(e.winnerTeam)} (${name(e.winnerSeat!)})`;
-    case 'envidoResult': {
-      const best = e.reveals.find((r) => r.seat === e.winnerSeat);
-      return `Envido: gana ${name(e.winnerSeat)} con ${best?.points}. (${e.reveals.map((r) => `${name(r.seat)} ${r.points}`).join(', ')})`;
-    }
-    case 'florResult':
-      return `Flor para ${t(e.winnerTeam)}: ${e.reveals.map((r) => `${name(r.seat)} ${r.points}`).join(', ')}`;
-    case 'score':
-      return `+${e.points} ${t(e.team)} por ${SCORE_REASON[e.reason]}`;
-    case 'handEnd':
-      return null;
-    case 'gameOver':
-      return `🏆 ¡Ganó ${t(e.winnerTeam)}!`;
-  }
 }

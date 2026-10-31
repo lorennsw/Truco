@@ -22,7 +22,7 @@ function Seat({ seat, room }: { seat: SeatView; room: RoomView }) {
   return (
     <div className={`flex min-h-16 items-center gap-3 rounded-2xl border-2 ${p ? color : 'border-dashed border-white/15'} bg-black/25 px-3 py-2.5`}>
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-lg font-bold">
-        {p ? (p.isBot ? '🤖' : p.name[0]?.toUpperCase()) : seat.index + 1}
+        {p ? (p.isBot ? 'B' : p.name[0]?.toUpperCase()) : seat.index + 1}
       </span>
       <div className="min-w-0 flex-1">
         {p ? (
@@ -43,17 +43,17 @@ function Seat({ seat, room }: { seat: SeatView; room: RoomView }) {
       </div>
       <div className="flex shrink-0 gap-1.5">
         {(!p || p.isBot) && !mine && (
-          <button onClick={() => sit(seat.index)} className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-bold hover:bg-white/25">
+          <button onClick={() => sit(seat.index)} className="btn btn-secondary btn-sm h-8">
             Sentarme
           </button>
         )}
         {!p && isHost && (
-          <button onClick={() => addBot(seat.index)} className="rounded-lg bg-white/10 px-2.5 py-1.5 text-xs font-semibold hover:bg-white/20" title="Agregar bot">
+          <button onClick={() => addBot(seat.index)} className="btn btn-ghost btn-sm h-8" title="Agregar bot">
             + Bot
           </button>
         )}
         {mine && (
-          <button onClick={stand} className="rounded-lg bg-white/10 px-2.5 py-1.5 text-xs hover:bg-white/20">
+          <button onClick={stand} className="btn btn-ghost btn-sm h-8">
             Pararme
           </button>
         )}
@@ -77,7 +77,7 @@ export function Lobby({ room }: { room: RoomView }) {
   return (
     <div className="mx-auto flex min-h-full max-w-6xl flex-col gap-5 px-4 py-5">
       <header className="flex flex-wrap items-center gap-3">
-        <button onClick={leaveRoom} className="rounded-xl bg-white/10 px-3 py-2 text-sm hover:bg-white/20">
+        <button onClick={leaveRoom} className="btn btn-secondary btn-sm">
           ← Salir
         </button>
         <div className="min-w-0 flex-1">
@@ -94,10 +94,10 @@ export function Lobby({ room }: { room: RoomView }) {
             <div className="font-mono text-2xl font-black tracking-[0.25em] text-gold">{room.code}</div>
           </div>
           <div className="flex flex-col gap-1">
-            <button onClick={() => copy(room.code, 'Código')} className="rounded-lg bg-white/10 px-2.5 py-1 text-xs hover:bg-white/20">
+            <button onClick={() => copy(room.code, 'Código')} className="btn btn-secondary btn-sm h-7 text-xs">
               Copiar código
             </button>
-            <button onClick={() => copy(link, 'Enlace')} className="rounded-lg bg-white/10 px-2.5 py-1 text-xs hover:bg-white/20">
+            <button onClick={() => copy(link, 'Enlace')} className="btn btn-secondary btn-sm h-7 text-xs">
               Copiar enlace
             </button>
           </div>
@@ -139,7 +139,7 @@ export function Lobby({ room }: { room: RoomView }) {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-display text-xl font-bold">Reglamento de esta mesa</h2>
               {isHost && (
-                <button onClick={() => setEditRules((v) => !v)} className="rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/20">
+                <button onClick={() => setEditRules((v) => !v)} className="btn btn-secondary btn-sm">
                   {editRules ? 'Listo' : 'Editar'}
                 </button>
               )}
@@ -179,17 +179,17 @@ export function Lobby({ room }: { room: RoomView }) {
               <button
                 disabled={!full}
                 onClick={startGame}
-                className="rounded-xl bg-gold px-6 py-3.5 text-lg font-black text-felt-950 shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                className="btn btn-gold btn-lg w-full"
               >
                 ¡Empezar partida!
               </button>
               {!full && <p className="text-center text-xs text-white/55">Completá los lugares (podés agregar bots).</p>}
-              <button onClick={autoTeams} className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20">
+              <button onClick={autoTeams} className="btn btn-secondary w-full">
                 🎲 Sortear equipos
               </button>
               <button
                 onClick={() => room.seats.forEach((s) => !s.player && addBot(s.index))}
-                className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20"
+                className="btn btn-secondary w-full"
               >
                 🤖 Completar con bots
               </button>

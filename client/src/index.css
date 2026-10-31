@@ -1,17 +1,47 @@
 @import 'tailwindcss';
 
+/* ───────────────────────── Sistema visual ─────────────────────────
+   Colores: verde casi negro de fondo, paño esmeralda, acentos jade, marfil y dorado suave.
+   Escala de espaciado: la de Tailwind (4px). Radios: sm 8 · md 12 · lg 16 · xl 22.
+   Alturas de control: 36 (compacto) · 44 (estándar) · 52 (destacado). */
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Playfair Display', Georgia, serif;
+
+  --color-ink-950: #050d0a;
+  --color-ink-900: #08140f;
+  --color-ink-850: #0b1a14;
+  --color-ink-800: #10221a;
+  --color-ink-700: #183126;
   --color-felt-950: #04170f;
   --color-felt-900: #082a1c;
   --color-felt-800: #0b3d2a;
   --color-felt-700: #0f5138;
   --color-felt-600: #146a49;
-  --color-cream: #fdf8ec;
-  --color-gold: #e3b341;
-  --color-team0: #38bdf8;
-  --color-team1: #fb7185;
+  --color-jade: #4cc29a;
+  --color-jade-strong: #2fa57d;
+  --color-ivory: #f3ecdb;
+  --color-cream: #fbf6ea;
+  --color-gold: #d8b56a;
+  --color-gold-soft: #b99652;
+  --color-team0: #79b4d9;
+  --color-team1: #e29a86;
+  --color-danger: #d9695c;
+  --color-envido: #7fc4e0;
+  --color-truco: #e2b75e;
+  --color-flor: #c79be0;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.3), 0 18px 40px rgba(0, 0, 0, 0.42);
+  --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.25), 0 4px 10px rgba(0, 0, 0, 0.32);
+  --shadow-card-lift: 0 2px 3px rgba(0, 0, 0, 0.25), 0 16px 28px rgba(0, 0, 0, 0.45);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 :root {
@@ -26,44 +56,296 @@ body,
 
 body {
   margin: 0;
-  background: radial-gradient(ellipse at top, #0f5138 0%, #082a1c 55%, #04170f 100%) fixed;
-  color: #ecfdf5;
+  background:
+    radial-gradient(1200px 700px at 50% 35%, rgba(22, 92, 64, 0.35), transparent 70%),
+    radial-gradient(ellipse at top, #0c1f17 0%, #07120d 60%, #040a07 100%) fixed;
+  background-color: #050d0a;
+  color: var(--color-ivory);
   font-family: var(--font-sans);
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
 }
 
-.felt {
-  background:
-    radial-gradient(ellipse at center, rgba(255, 255, 255, 0.08), transparent 60%),
-    repeating-radial-gradient(circle at 30% 30%, rgba(0, 0, 0, 0.035) 0 2px, transparent 2px 4px),
-    radial-gradient(ellipse at center, #17784f 0%, #0f5c3c 55%, #0a4029 100%);
+:focus-visible {
+  outline: 2px solid var(--color-jade);
+  outline-offset: 2px;
 }
 
-.wood {
-  background: linear-gradient(145deg, #6b3f1d, #3d220e 45%, #5a3416);
+/* Componentes en su capa: así las utilidades de Tailwind (hidden, h-8, etc.) pueden ajustarlos. */
+@layer components {
+/* ───────────────────────── Superficies ───────────────────────── */
+
+.panel {
+  background: linear-gradient(180deg, rgba(16, 34, 26, 0.86), rgba(8, 20, 15, 0.9));
+  border: 1px solid rgba(243, 236, 219, 0.07);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(12px);
+}
+
+.hairline {
+  border-color: rgba(243, 236, 219, 0.08);
+}
+
+/* Paño: esmeralda oscuro con una textura muy sutil y luz cenital discreta. */
+.felt {
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 42%, rgba(255, 255, 255, 0.07), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at 50% 45%, #136b4a 0%, #0e5639 48%, #093b27 100%);
   box-shadow:
-    inset 0 2px 4px rgba(255, 220, 170, 0.25),
-    0 30px 60px rgba(0, 0, 0, 0.55);
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+    inset 0 18px 40px rgba(0, 0, 0, 0.35),
+    inset 0 -10px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* Borde: madera oscura con un filo cálido arriba. */
+.wood {
+  background:
+    linear-gradient(180deg, rgba(255, 214, 160, 0.16), transparent 22%, transparent 78%, rgba(0, 0, 0, 0.35)),
+    linear-gradient(135deg, #4a2a14 0%, #2e190b 45%, #3f2410 70%, #24130a 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 170, 0.28),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+    0 30px 70px rgba(0, 0, 0, 0.6),
+    0 6px 16px rgba(0, 0, 0, 0.45);
+}
+.wood-inlay {
+  box-shadow: inset 0 0 0 1px rgba(216, 181, 106, 0.35);
 }
 
 .card-back {
   background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.12) 0 4px, transparent 4px 10px),
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 0 4px, transparent 4px 10px),
-    linear-gradient(135deg, #8d1c2b, #5c0f1b);
+    radial-gradient(circle at 50% 50%, rgba(216, 181, 106, 0.45) 0 14%, transparent 15%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.07) 0 3px, transparent 3px 8px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.07) 0 3px, transparent 3px 8px),
+    linear-gradient(160deg, #7e2130, #521320);
+  border: 2px solid var(--color-cream);
+  box-shadow: inset 0 0 0 2px rgba(216, 181, 106, 0.4), var(--shadow-card);
 }
 
-.panel {
-  background: rgba(4, 23, 15, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(10px);
+/* Dorso en miniatura, para indicar cuántas cartas le quedan a cada rival. */
+.card-back-mini {
+  width: 11px;
+  aspect-ratio: 2 / 3;
+  border-radius: 2px;
+  background: linear-gradient(160deg, #8a2a39, #561522);
+  border: 1px solid rgba(251, 246, 234, 0.85);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
+
+/* ───────────────────────── Cartas ───────────────────────── */
+
+/* La carta se dimensiona solo por su ancho; todo lo interno es relativo (cqw / %). */
+.scard {
+  container-type: inline-size;
+  aspect-ratio: 2 / 3;
+  border-radius: 9% / 6%;
+  background: linear-gradient(170deg, #fffdf6 0%, #f7f0de 100%);
+  box-shadow: var(--shadow-card);
+  transition:
+    translate 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out),
+    filter 160ms ease;
+}
+.scard-frame {
+  position: absolute;
+  inset: 4.5%;
+  border-radius: 7% / 4.6%;
+  border: max(1px, 1.6cqw) solid currentColor;
+  opacity: 0.22;
+  pointer-events: none;
+}
+.scard-index {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1cqw;
+  font-weight: 800;
+  line-height: 0.9;
+  font-size: max(9px, 19cqw);
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.scard-index svg {
+  width: 14cqw;
+  height: 14cqw;
+}
+.scard-playable {
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .scard-playable:hover {
+    translate: 0 -12%;
+    box-shadow: var(--shadow-card-lift);
+  }
+}
+.scard-playable:focus-visible {
+  translate: 0 -12%;
+  box-shadow: var(--shadow-card-lift);
+}
+.scard-selected {
+  translate: 0 -16%;
+  box-shadow:
+    0 0 0 3px var(--color-jade),
+    var(--shadow-card-lift);
+}
+.scard-idle {
+  filter: saturate(0.82) brightness(0.92);
+}
+.scard-winner {
+  box-shadow:
+    0 0 0 2px var(--color-gold),
+    0 0 22px rgba(216, 181, 106, 0.55),
+    var(--shadow-card);
+}
+
+/* ───────────────────────── Controles ───────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 44px;
+  padding: 0 1.1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  font-weight: 650;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 120ms var(--ease-out),
+    box-shadow 140ms ease;
+  user-select: none;
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-sm {
+  height: 36px;
+  padding: 0 0.85rem;
+  font-size: 0.8125rem;
+  border-radius: 10px;
+}
+.btn-lg {
+  height: 52px;
+  padding: 0 1.5rem;
+  font-size: 1rem;
+}
+.btn-primary {
+  background: linear-gradient(180deg, #55cba3, #2fa57d);
+  color: #04170f;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 6px 18px rgba(47, 165, 125, 0.32);
+}
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #66d6b0, #38b289);
+}
+.btn-gold {
+  background: linear-gradient(180deg, #e3c37c, #c19d55);
+  color: #1b1206;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 6px 18px rgba(193, 157, 85, 0.3);
+}
+.btn-gold:hover:not(:disabled) {
+  background: linear-gradient(180deg, #ecce8b, #cba760);
+}
+.btn-secondary {
+  background: rgba(243, 236, 219, 0.06);
+  border: 1px solid rgba(243, 236, 219, 0.16);
+  color: var(--color-ivory);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(243, 236, 219, 0.11);
+  border-color: rgba(243, 236, 219, 0.26);
+}
+.btn-accent {
+  background: rgba(8, 20, 15, 0.55);
+  border: 1px solid color-mix(in oklab, var(--accent, var(--color-gold)) 55%, transparent);
+  color: color-mix(in oklab, var(--accent, var(--color-gold)) 85%, white);
+}
+.btn-accent:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--accent, var(--color-gold)) 16%, rgba(8, 20, 15, 0.6));
+  border-color: var(--accent, var(--color-gold));
+}
+.btn-ghost {
+  background: transparent;
+  color: rgba(243, 236, 219, 0.66);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(243, 236, 219, 0.07);
+  color: var(--color-ivory);
+}
+.btn-danger {
+  background: rgba(217, 105, 92, 0.16);
+  border: 1px solid rgba(217, 105, 92, 0.55);
+  color: #f3b3aa;
+}
+.btn-danger:hover:not(:disabled) {
+  background: rgba(217, 105, 92, 0.26);
+}
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: rgba(8, 20, 15, 0.6);
+  border: 1px solid rgba(243, 236, 219, 0.08);
+  color: rgba(243, 236, 219, 0.8);
+  transition: background-color 140ms ease, color 140ms ease;
+}
+.icon-btn:hover {
+  background: rgba(243, 236, 219, 0.1);
+  color: var(--color-ivory);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 22px;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.label {
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(243, 236, 219, 0.5);
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(243, 236, 219, 0.16) transparent;
+}
+}
+
+/* ───────────────────────── Animaciones (breves y discretas) ───────────────────────── */
 
 @keyframes deal-in {
   from {
     opacity: 0;
-    transform: translateY(40px) scale(0.85) rotate(-6deg);
+    transform: translateY(-36px) scale(0.9) rotate(-4deg);
   }
   to {
     opacity: 1;
@@ -71,36 +353,51 @@ body {
   }
 }
 .anim-deal {
-  animation: deal-in 0.35s ease-out both;
+  animation: deal-in 380ms var(--ease-out) both;
 }
 
-@keyframes drop-in {
+@keyframes play-in {
   from {
     opacity: 0;
-    transform: scale(1.25);
+    transform: translateY(18px) scale(1.12);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: none;
   }
 }
 .anim-drop {
-  animation: drop-in 0.25s ease-out both;
+  animation: play-in 260ms var(--ease-out) both;
+}
+
+@keyframes win-pulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.07);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.anim-win {
+  animation: win-pulse 520ms var(--ease-out) both;
 }
 
 @keyframes bubble {
   0% {
     opacity: 0;
-    transform: translate(-50%, 6px) scale(0.7);
+    transform: translate(-50%, 4px) scale(0.85);
   }
-  12% {
+  10% {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1.08);
+    transform: translate(-50%, 0) scale(1.04);
   }
-  20% {
+  18% {
     transform: translate(-50%, 0) scale(1);
   }
-  85% {
+  86% {
     opacity: 1;
   }
   100% {
@@ -108,39 +405,79 @@ body {
   }
 }
 .anim-bubble {
-  animation: bubble 2.8s ease-out both;
-}
-
-@keyframes pulse-ring {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(227, 179, 65, 0.7);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(227, 179, 65, 0);
-  }
-}
-.turn-glow {
-  animation: pulse-ring 1.4s ease-in-out infinite;
+  animation: bubble 2.8s var(--ease-out) both;
 }
 
 @keyframes pop {
   from {
     opacity: 0;
-    transform: scale(0.9);
+    transform: translateY(6px) scale(0.97);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: none;
   }
 }
 .anim-pop {
-  animation: pop 0.2s ease-out both;
+  animation: pop 220ms var(--ease-out) both;
 }
 
-.scrollbar-thin {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+@keyframes bump {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.28);
+    color: var(--color-gold);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.anim-bump {
+  display: inline-block;
+  animation: bump 520ms var(--ease-out);
+}
+
+@keyframes turn-ring {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px var(--color-gold),
+      0 0 0 0 rgba(216, 181, 106, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px var(--color-gold),
+      0 0 0 7px rgba(216, 181, 106, 0);
+  }
+}
+.turn-glow {
+  animation: turn-ring 1.6s ease-in-out infinite;
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+.anim-drawer {
+  animation: slide-in-right 240ms var(--ease-out) both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.anim-fade {
+  animation: fade-in 180ms ease both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -148,6 +485,7 @@ body {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }
