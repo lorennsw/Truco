@@ -372,9 +372,9 @@ function TableStage({ room, g, seats, fraction, secsLeft }: { room: RoomView; g:
           {/* Resultado de la mano */}
           {result && (
             <div className="anim-pop absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
-              <div className="panel flex flex-col items-center gap-1 rounded-[var(--radius-xl)] px-6 py-4 text-center">
+              <div className="flex flex-col items-center gap-1 whitespace-nowrap rounded-[var(--radius-xl)] border border-ivory/10 bg-ink-900 px-6 py-4 text-center shadow-[var(--shadow-lift)]">
                 <span className="label">Fin de la mano</span>
-                <span className={`font-display text-2xl font-bold ${result.winnerTeam === 0 ? 'text-team0' : 'text-team1'}`}>
+                <span className={`font-display text-xl font-bold sm:text-2xl ${result.winnerTeam === 0 ? 'text-team0' : 'text-team1'}`}>
                   {mySeat === null ? `Gana ${teamName(result.winnerTeam, null)}` : result.winnerTeam === myTeam ? 'Ganamos la mano' : 'Ganaron la mano'}
                 </span>
                 <span className="text-sm text-ivory/65">

@@ -1,77 +1,175 @@
+import { useEffect, useRef, useState } from 'react';
 import { halfScore } from '@truco/shared';
 import type { RulesConfig, Team } from '@truco/shared';
 import { teamName } from '../texts';
 
-/** Barra de progreso hacia el objetivo, en tramos de 5 puntos (como los fósforos), con la línea de malas/buenas. */
-function Progress({ points, target, team }: { points: number; target: number; team: Team }) {
+const LS_KEY = 'truco.anotador';
+
+/** Pequeño desvío determinista para que los palitos parezcan dibujados a mano. */
+const jitter = (seed: number) => ((Math.sin(seed * 12.9898) * 43758.5453) % 1) * 1.4;
+
+// Orden tradicional de los fósforos: izquierda, arriba, derecha, abajo y la diagonal que cierra el cuadrado.
+const STICKS: [number, number, number, number][] = [
+  [6, 5, 6, 27],
+  [5, 6, 27, 6],
+  [26, 5, 26, 27],
+  [5, 26, 27, 26],
+  [8, 24, 24, 8],
+];
+
+/** Un cuadrado de fósforos (5 puntos). Los palitos desde `animateFrom` (los recién sumados) se dibujan animados. */
+function Square({ filled, group, animateFrom }: { filled: number; group: number; animateFrom: number }) {
+  return (
+    <svg viewBox="0 0 32 32" className="h-[30px] w-[30px]" aria-hidden>
+      {STICKS.slice(0, filled).map(([x1, y1, x2, y2], i) => {
+        const index = group * 5 + i;
+        const isNew = index >= animateFrom;
+        return (
+          <line
+            key={i}
+            x1={x1 + jitter(index)}
+            y1={y1 + jitter(index + 0.3)}
+            x2={x2 - jitter(index + 0.6)}
+            y2={y2 - jitter(index + 0.9)}
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            className={isNew ? 'anim-stroke' : ''}
+            style={isNew ? { animationDelay: `${(index - animateFrom) * 90}ms` } : undefined}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+/** Columna de un equipo: los cuadrados de fósforos de arriba hacia abajo, con la línea de malas y buenas. */
+function Tally({ points, target, animateFrom }: { points: number; target: number; animateFrom: number }) {
   const groups = target / 5;
   const half = target >= 24 ? groups / 2 : null;
   return (
-    <div className="flex items-center gap-[3px]" aria-hidden>
-      {Array.from({ length: groups }, (_, i) => {
-        const fill = Math.max(0, Math.min(5, points - i * 5)) / 5;
-        return (
-          <span key={i} className={`relative h-1.5 w-3 overflow-hidden rounded-full bg-ivory/10 sm:w-4 ${half !== null && i === half ? 'ml-1.5' : ''}`}>
-            <span
-              className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 ${team === 0 ? 'bg-team0' : 'bg-team1'}`}
-              style={{ width: `${fill * 100}%` }}
-            />
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
-function TeamRow({ team, score, rules, mySeat }: { team: Team; score: number; rules: RulesConfig; mySeat: number | null }) {
-  const half = halfScore(rules);
-  return (
-    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3">
-      <span className={`h-2 w-2 rounded-full ${team === 0 ? 'bg-team0' : 'bg-team1'}`} />
-      <div className="flex min-w-0 flex-col gap-1">
-        <div className="flex items-baseline gap-2">
-          <span className="truncate text-[13px] font-semibold text-ivory/90">{teamName(team, mySeat)}</span>
-          {half !== null && <span className="text-[10px] font-semibold uppercase tracking-wider text-ivory/40">{score >= half ? 'buenas' : 'malas'}</span>}
-        </div>
-        <Progress points={score} target={rules.targetScore} team={team} />
-      </div>
-      {/* La key reinicia la animación cada vez que cambia el puntaje. */}
-      <span key={score} className="anim-bump min-w-[2ch] text-right text-2xl font-extrabold tabular-nums leading-none text-ivory">
-        {score}
-      </span>
-    </div>
-  );
-}
-
-export function ScoreBoard({ score, rules, mySeat, compact }: { score: [number, number]; rules: RulesConfig; mySeat: number | null; compact?: boolean }) {
-  const order: Team[] = mySeat !== null && mySeat % 2 === 1 ? [1, 0] : [0, 1];
-  if (compact) {
-    return (
-      <div className="panel flex items-center gap-3 rounded-[var(--radius-lg)] px-3 py-1.5" aria-label="Marcador">
-        {order.map((team, i) => (
-          <div key={team} className="flex items-center gap-1.5">
-            {i === 1 && <span className="mr-1.5 h-5 w-px bg-ivory/10" />}
-            <span className={`h-2 w-2 rounded-full ${team === 0 ? 'bg-team0' : 'bg-team1'}`} />
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-ivory/60">{teamName(team, mySeat).slice(0, 8)}</span>
-            <span key={score[team]} className="anim-bump text-lg font-extrabold tabular-nums leading-none">
-              {score[team]}
-            </span>
-          </div>
-        ))}
-        <span className="text-[10px] font-semibold text-ivory/40">/{rules.targetScore}</span>
-      </div>
-    );
-  }
-  return (
-    <div className="panel flex items-center gap-4 rounded-[var(--radius-lg)] px-4 py-2" aria-label="Marcador">
-      {order.map((team, i) => (
-        <div key={team} className="flex items-center gap-4">
-          {i === 1 && <span className="h-8 w-px bg-ivory/10" />}
-          <div className="w-44">
-            <TeamRow team={team} score={score[team]} rules={rules} mySeat={mySeat} />
-          </div>
+    <div className="flex flex-col items-center gap-1">
+      {Array.from({ length: groups }, (_, g) => (
+        <div key={g} className="flex flex-col items-center">
+          {half !== null && g === half && <span className="my-1 h-px w-16 bg-pen/25" />}
+          <Square filled={Math.max(0, Math.min(5, points - g * 5))} group={g} animateFrom={animateFrom} />
         </div>
       ))}
+    </div>
+  );
+}
+
+const puntos = (n: number) => `${n} ${n === 1 ? 'punto' : 'puntos'}`;
+
+function Chevron({ up }: { up: boolean }) {
+  return (
+    <svg viewBox="0 0 24 12" className={`h-3 w-6 transition-transform duration-200 ${up ? '' : 'rotate-180'}`} aria-hidden>
+      <path d="M3 10 L12 3 L21 10" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/**
+ * Anotador de papel. Plegado muestra solo los puntos; desplegado, los fósforos de cada equipo.
+ * Siempre refleja el puntaje real de la partida.
+ */
+export function ScoreBoard({ score, rules, mySeat }: { score: [number, number]; rules: RulesConfig; mySeat: number | null; compact?: boolean }) {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(LS_KEY) === 'abierto';
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_KEY, open ? 'abierto' : 'cerrado');
+    } catch {
+      /* almacenamiento no disponible */
+    }
+  }, [open]);
+
+  // Los palitos nuevos (desde el puntaje anterior) se dibujan con animación.
+  const prev = useRef<[number, number]>(score);
+  const animateFrom: [number, number] = [prev.current[0], prev.current[1]];
+  useEffect(() => {
+    prev.current = score;
+  }, [score]);
+
+  const order: Team[] = mySeat !== null && mySeat % 2 === 1 ? [1, 0] : [0, 1];
+  const half = halfScore(rules);
+  const status = (team: Team) => (half === null ? null : score[team] >= half ? 'buenas' : 'malas');
+  const columns = (render: (team: Team) => React.ReactNode, divider = 'my-1.5') => (
+    <div className="grid grid-cols-[1fr_1px_1fr]">
+      {render(order[0])}
+      <span className={`bg-pen/35 ${divider}`} />
+      {render(order[1])}
+    </div>
+  );
+
+  return (
+    // El espacio reservado en la barra es el del papel plegado; desplegado, crece hacia abajo por encima de la mesa.
+    <div className="relative h-[60px] w-[188px] shrink-0 sm:w-[212px]">
+      <div className="paper absolute right-0 top-0 z-30 w-full overflow-hidden rounded-[6px] font-hand" aria-label="Anotador">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-label={open ? 'Esconder el anotador' : 'Ver el anotador'}
+          className="block w-full text-left"
+        >
+          {columns((team) => (
+            <div key={team} className="flex flex-col items-center px-2 pt-1.5 leading-none">
+              <span className="text-[19px] font-bold">{teamName(team, mySeat)}</span>
+              {!open && (
+                <span key={score[team]} className="anim-bump mt-0.5 text-[18px] font-medium tabular-nums">
+                  {puntos(score[team])}
+                </span>
+              )}
+            </div>
+          ))}
+          {!open && (
+            <span className="flex justify-center pb-0.5 text-pen/70">
+              <Chevron up={false} />
+            </span>
+          )}
+        </button>
+
+        {/* Fósforos: se despliegan con una transición de altura */}
+        <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="min-h-0 overflow-hidden">
+            <div className="pb-1 pt-2">
+              {columns(
+                (team) => (
+                  <div key={team} className="flex flex-col items-center gap-1">
+                    <Tally points={score[team]} target={rules.targetScore} animateFrom={open ? animateFrom[team] : score[team]} />
+                    {status(team) && <span className="text-[14px] text-pen/55">{status(team)}</span>}
+                  </div>
+                ),
+                '',
+              )}
+            </div>
+            <div className="border-t border-pen/15">
+              {columns((team) => (
+                <span key={team} className="py-1 text-center text-[19px] font-bold tabular-nums">
+                  <span key={score[team]} className="anim-bump">
+                    {puntos(score[team])}
+                  </span>
+                </span>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Esconder el anotador"
+              className="flex w-full justify-center pb-1 pt-0.5 text-pen/70 hover:text-pen"
+            >
+              <Chevron up />
+            </button>
+            <div className="pb-1.5 text-center text-[13px] text-pen/45">a {rules.targetScore} puntos</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

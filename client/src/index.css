@@ -7,6 +7,9 @@
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Playfair Display', Georgia, serif;
+  --font-hand: 'Caveat', 'Segoe Print', cursive;
+  --color-paper: #f5eedb;
+  --color-pen: #24314f;
 
   --color-ink-950: #050d0a;
   --color-ink-900: #08140f;
@@ -478,6 +481,30 @@ body {
 }
 .anim-fade {
   animation: fade-in 180ms ease both;
+}
+
+/* Anotador: el palito nuevo se dibuja como un trazo de birome. */
+@keyframes draw-stroke {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.anim-stroke {
+  stroke-dasharray: 32;
+  stroke-dashoffset: 32;
+  animation: draw-stroke 420ms ease-out forwards;
+}
+
+/* Papel del anotador */
+.paper {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.4 0 0 0 0 0.3 0 0 0 0 0.15 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, #f8f2e1, #efe5cb);
+  color: var(--color-pen);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 2px 4px rgba(0, 0, 0, 0.25),
+    0 14px 30px rgba(0, 0, 0, 0.4);
 }
 
 @media (prefers-reduced-motion: reduce) {
