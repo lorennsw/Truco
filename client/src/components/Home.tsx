@@ -42,13 +42,15 @@ export function Home() {
       <header className="flex flex-col items-center gap-4 text-center">
         <div className="relative flex h-28 w-48 items-end justify-center">
           {[makeCard(1, 'espada'), makeCard(1, 'basto'), makeCard(7, 'espada'), makeCard(7, 'oro')].map((c, i) => (
-            <SpanishCard
+            <div
               key={c.id}
-              card={c}
-              size="md"
-              className="anim-deal absolute bottom-0"
-              style={{ transform: `translateX(${(i - 1.5) * 34}px) rotate(${(i - 1.5) * 12}deg)`, transformOrigin: 'bottom center', animationDelay: `${i * 90}ms` }}
-            />
+              className="absolute bottom-0"
+              style={{ transform: `translateX(${(i - 1.5) * 34}px) rotate(${(i - 1.5) * 12}deg)`, transformOrigin: 'bottom center' }}
+            >
+              <div className="anim-deal" style={{ animationDelay: `${i * 90}ms` }}>
+                <SpanishCard card={c} size="md" />
+              </div>
+            </div>
           ))}
         </div>
         <div>

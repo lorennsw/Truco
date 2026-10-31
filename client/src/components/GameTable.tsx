@@ -148,7 +148,7 @@ export function GameTable({ room }: { room: RoomView }) {
     return { x: 50 + Math.cos(angle) * radius * 0.96, y: 50 + Math.sin(angle) * radius };
   };
   const tableCard = n === 6 || !wide ? 'sm' : 'md';
-  const cardStep = n === 6 || !wide ? 16 : 24;
+  const cardStep = n === 6 || !wide ? 20 : 34;
 
   const pendingByOthers = g.pending && g.respondingTeam !== myTeam;
   const lastCaller = (() => {
@@ -239,17 +239,20 @@ export function GameTable({ room }: { room: RoomView }) {
             return (
               <div key={`played-${s.index}`} className="pointer-events-none absolute" style={{ left: `${p.x}%`, top: `${p.y}%` }}>
                 {cards.map(({ t, play }, i) => (
-                  <SpanishCard
+                  // La posición va en un contenedor y la animación en otro: si comparten
+                  // elemento, el `transform` de la animación pisa el del abanico.
+                  <div
                     key={play!.card.id}
-                    card={play!.card}
-                    size={tableCard}
-                    highlight={t.done && t.winnerSeat === s.index}
-                    className="anim-drop absolute"
+                    className="absolute left-0 top-0"
                     style={{
                       transform: `translate(-50%, -50%) translate(${(i - (cards.length - 1) / 2) * cardStep}px, ${i * 3}px) rotate(${(i - 1) * 7}deg)`,
                       zIndex: i,
                     }}
-                  />
+                  >
+                    <div className="anim-drop">
+                      <SpanishCard card={play!.card} size={tableCard} highlight={t.done && t.winnerSeat === s.index} />
+                    </div>
+                  </div>
                 ))}
               </div>
             );
@@ -347,15 +350,15 @@ export function GameTable({ room }: { room: RoomView }) {
                 {g.myHand.map((c, i) => {
                   const playable = g.legal.some((a) => a.type === 'play' && a.cardId === c.id);
                   return (
-                    <SpanishCard
+                    <div
                       key={`${g.handNumber}-${c.id}`}
-                      card={c}
-                      size="lg"
-                      playable={playable}
-                      onClick={() => onAction({ type: 'play', cardId: c.id })}
-                      className="anim-deal -ml-3 first:ml-0 sm:-ml-2"
-                      style={{ transform: `rotate(${(i - (g.myHand.length - 1) / 2) * 5}deg)`, animationDelay: `${i * 80}ms` }}
-                    />
+                      className="-ml-3 first:ml-0 sm:-ml-2"
+                      style={{ transform: `rotate(${(i - (g.myHand.length - 1) / 2) * 5}deg)` }}
+                    >
+                      <div className="anim-deal" style={{ animationDelay: `${i * 80}ms` }}>
+                        <SpanishCard card={c} size="lg" playable={playable} onClick={() => onAction({ type: 'play', cardId: c.id })} />
+                      </div>
+                    </div>
                   );
                 })}
                 {g.myHand.length === 0 && <div className="h-[7.8rem] sm:h-36" />}
