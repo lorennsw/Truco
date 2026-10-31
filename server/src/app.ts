@@ -81,6 +81,7 @@ export function createTrucoServer({ serveClient = true } = {}) {
     socket.on('room:rematch', () => handle(socket, undefined, () => rooms.rematch(player())));
     socket.on('game:action', (p, ack) => handle(socket, ack, () => rooms.action(player(), p)));
     socket.on('chat:send', (p) => handle(socket, undefined, () => rooms.chat(player(), p?.text)));
+    socket.on('teamChat:send', (p, ack) => handle(socket, ack, () => rooms.teamChat(player(), p?.text, p?.clientId)));
 
     socket.on('disconnect', () => rooms.disconnect(socket));
   });

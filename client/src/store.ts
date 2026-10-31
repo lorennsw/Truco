@@ -159,6 +159,12 @@ export const startGame = async () => check(await socket.emitWithAck('room:start'
 export const rematch = () => socket.emit('room:rematch');
 export const sendAction = async (a: Action) => check(await socket.emitWithAck('game:action', a));
 export const sendChat = (text: string) => socket.emit('chat:send', { text });
+
+/** Chat de equipo: el servidor decide el equipo. El clientId evita duplicados si el envío se reintenta. */
+export async function sendTeamChat(text: string) {
+  const clientId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+  return check(await socket.emitWithAck('teamChat:send', { text, clientId }));
+}
 export const subscribeLobby = () => {
   socket.emit('lobby:subscribe');
   const resub = () => socket.emit('lobby:subscribe');

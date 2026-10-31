@@ -30,6 +30,22 @@ export interface ChatMessage {
   system?: boolean;
 }
 
+/** Mensaje del chat privado de un equipo. Equipo, remitente y hora los fija el servidor. */
+export interface TeamChatMessage {
+  id: string;
+  gameId: string;
+  senderId: string;
+  senderName: string;
+  seat: number;
+  team: Team;
+  text: string;
+  at: number;
+}
+
+/** Límites del chat de equipo (los valida el servidor). */
+export const TEAM_CHAT_MAX_LENGTH = 300;
+export const TEAM_CHAT_HISTORY = 100;
+
 export type RoomStatus = 'lobby' | 'playing' | 'finished';
 
 export interface RoomView {
@@ -43,6 +59,11 @@ export interface RoomView {
   seats: SeatView[];
   members: MemberView[];
   chat: ChatMessage[];
+  /**
+   * Historial privado del equipo de quien recibe esta vista (null si no corresponde:
+   * 1 vs 1, espectador o fuera de partida). Nunca incluye mensajes del otro equipo.
+   */
+  teamChat: TeamChatMessage[] | null;
   game: PlayerView | null;
   /** Milisegundos que quedan para la jugada actual (null = sin límite). */
   turnMsLeft: number | null;
@@ -88,6 +109,8 @@ export interface ClientToServer {
   'room:rematch': () => void;
   'game:action': (p: Action, ack?: Ack) => void;
   'chat:send': (p: { text: string }) => void;
+  /** El equipo destinatario lo decide el servidor; `clientId` evita duplicados en reintentos. */
+  'teamChat:send': (p: { text: string; clientId?: string }, ack: Ack<{ id: string }>) => void;
 }
 
 export interface ServerToClient {

@@ -15,6 +15,10 @@ import {
   RoomView,
   RulesConfig,
   ServerToClient,
+  TEAM_CHAT_HISTORY,
+  TEAM_CHAT_MAX_LENGTH,
+  Team,
+  TeamChatMessage,
   applyAction,
   chooseBotAction,
   createGame,
@@ -44,6 +48,15 @@ interface Member {
   isBot: boolean;
 }
 
+/** Chat privado de cada equipo, aislado por partida (un gameId nuevo en cada partida). */
+interface TeamChat {
+  gameId: string;
+  seq: number;
+  messages: [TeamChatMessage[], TeamChatMessage[]];
+  /** Mensajes ya aceptados por (jugador, clientId): evita duplicados por reintentos. */
+  seen: Map<string, string>;
+}
+
 interface Room {
   code: string;
   name: string;
@@ -57,6 +70,7 @@ interface Room {
   game: GameState | null;
   chat: ChatMessage[];
   chatSeq: number;
+  teamChat: TeamChat | null;
   timer: NodeJS.Timeout | null;
   deadline: number | null;
   emptySince: number | null;
@@ -65,6 +79,9 @@ interface Room {
 const BOT_NAMES = ['Don Pepe', 'La Chola', 'El Tano', 'Doña Rosa', 'El Gringo', 'Coco', 'Pocho', 'Mirta', 'El Ruso', 'Tita'];
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const HAND_PAUSE_MS = 4000;
+// Límite de frecuencia del chat de equipo: como máximo 5 mensajes cada 5 segundos.
+const TEAM_CHAT_BURST = 5;
+const TEAM_CHAT_WINDOW_MS = 5000;
 const DISCONNECTED_ACT_MS = 20000;
 const LOBBY_DISCONNECT_KICK_MS = 90000;
 const EMPTY_ROOM_TTL_MS = 10 * 60000;
@@ -76,6 +93,7 @@ export class RoomManager {
   private players = new Map<string, PlayerSession>();
   private rooms = new Map<string, Room>();
   private lobbyDirty = false;
+  private teamChatSent = new Map<string, number[]>();
 
   constructor(private io: IO) {
     setInterval(() => this.sweep(), 15000).unref();
@@ -187,6 +205,7 @@ export class RoomManager {
       game: null,
       chat: [],
       chatSeq: 0,
+      teamChat: null,
       timer: null,
       deadline: null,
       emptySince: null,
@@ -384,6 +403,7 @@ export class RoomManager {
     if (room.seats.some((s) => s === null)) throw new Error('Faltan jugadores: completá los lugares o agregá bots.');
     room.game = createGame({ numPlayers: MODE_PLAYERS[room.mode], rules: room.rules });
     room.status = 'playing';
+    room.teamChat = { gameId: randomUUID(), seq: 0, messages: [[], []], seen: new Map() };
     this.system(room, `¡Empieza la partida a ${room.rules.targetScore} puntos!`);
     this.update(room);
   }
@@ -414,7 +434,74 @@ export class RoomManager {
     const clean = String(text ?? '').trim().slice(0, 280);
     if (!clean) return;
     this.pushChat(room, { playerId: player.id, name: player.name, text: clean });
-    this.update(room);
+    // Solo se reenvía el estado: escribir en el chat no debe reiniciar el tiempo del turno.
+    this.broadcast(room);
+  }
+
+  /**
+   * Chat privado de equipo. El equipo se obtiene del asiento real del jugador en el servidor;
+   * el cliente no elige destinatarios. El mensaje solo se envía a los integrantes de ese equipo.
+   */
+  teamChat(player: PlayerSession, rawText: unknown, rawClientId: unknown): { id: string } {
+    const room = this.roomOf(player);
+    if (room.mode === 1) throw new Error('En 1 vs 1 no hay chat de equipo.');
+    if (room.status !== 'playing' || !room.game || !room.teamChat) throw new Error('El chat de equipo está disponible solo durante la partida.');
+    const seat = room.seats.indexOf(player.id);
+    if (seat < 0) throw new Error('Solo los jugadores de la partida pueden usar el chat de equipo.');
+
+    const text = typeof rawText === 'string' ? rawText.replace(/\r\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim() : '';
+    if (!text) throw new Error('El mensaje está vacío.');
+    if (text.length > TEAM_CHAT_MAX_LENGTH) throw new Error(`El mensaje es demasiado largo (máximo ${TEAM_CHAT_MAX_LENGTH} caracteres).`);
+
+    const tc = room.teamChat;
+    const clientId = typeof rawClientId === 'string' && rawClientId ? rawClientId.slice(0, 64) : null;
+    const dedupeKey = clientId ? `${player.id}:${clientId}` : null;
+    const already = dedupeKey ? tc.seen.get(dedupeKey) : undefined;
+    if (already) return { id: already }; // reintento del mismo mensaje: no se duplica
+
+    const now = Date.now();
+    const recent = (this.teamChatSent.get(player.id) ?? []).filter((t) => now - t < TEAM_CHAT_WINDOW_MS);
+    if (recent.length >= TEAM_CHAT_BURST) throw new Error('Estás enviando mensajes muy rápido. Esperá un momento.');
+    recent.push(now);
+    this.teamChatSent.set(player.id, recent);
+
+    const team = teamOf(seat);
+    const msg: TeamChatMessage = {
+      id: `${tc.gameId}:${++tc.seq}`,
+      gameId: tc.gameId,
+      senderId: player.id,
+      senderName: player.name,
+      seat,
+      team,
+      text,
+      at: now,
+    };
+    const list = tc.messages[team];
+    list.push(msg);
+    if (list.length > TEAM_CHAT_HISTORY) list.splice(0, list.length - TEAM_CHAT_HISTORY);
+    if (dedupeKey) {
+      tc.seen.set(dedupeKey, msg.id);
+      if (tc.seen.size > 500) tc.seen.delete(tc.seen.keys().next().value!);
+    }
+    this.broadcastTeam(room, team);
+    return { id: msg.id };
+  }
+
+  /** Historial del equipo de un jugador, solo si está sentado en la partida actual. */
+  private teamChatFor(room: Room, playerId: string): TeamChatMessage[] | null {
+    if (room.mode === 1 || !room.teamChat || room.status === 'lobby') return null;
+    const seat = room.seats.indexOf(playerId);
+    if (seat < 0) return null;
+    const team = teamOf(seat);
+    return room.teamChat.messages[team].filter((m) => m.team === team && m.gameId === room.teamChat!.gameId);
+  }
+
+  /** Envía el estado actualizado solo a los integrantes humanos de un equipo. */
+  private broadcastTeam(room: Room, team: Team) {
+    room.seats.forEach((id, seat) => {
+      if (!id || teamOf(seat) !== team || room.members.get(id)?.isBot) return;
+      this.io.to(`player:${id}`).emit('room:state', this.view(room, id));
+    });
   }
 
   private system(room: Room, text: string) {
@@ -532,6 +619,7 @@ export class RoomManager {
       seats: room.seats.map((id, index) => ({ index, team: teamOf(index), player: id ? memberInfo(id) : null })),
       members,
       chat: room.chat.slice(-60),
+      teamChat: this.teamChatFor(room, playerId),
       game: room.game ? getPlayerView(room.game, mySeat) : null,
       turnMsLeft: room.deadline ? Math.max(0, room.deadline - Date.now()) : null,
       me: { id: playerId, seat: mySeat },

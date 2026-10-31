@@ -60,6 +60,15 @@ puro y determinista, así que se prueba sin red y lo comparten cliente y servido
   tomar el lugar de un bot.
 - **Tiempo por jugada** configurable; al vencer, el servidor juega automáticamente.
 - **Chat** de mesa con mensajes rápidos, e **historial de jugadas**.
+- **Chat privado de equipo** (pestaña EQUIPO, solo en 2 vs 2 y 3 vs 3). La privacidad la garantiza el
+  servidor: el evento `teamChat:send` solo trae el texto; el servidor identifica al jugador por su sesión,
+  verifica que esté sentado en una partida en curso, obtiene su equipo del asiento real (pares contra
+  impares), valida el texto (vacío, máximo 300 caracteres) y aplica un límite de 5 mensajes cada 5 s.
+  El mensaje se guarda en el historial de ese equipo para esa partida (`gameId` nuevo en cada partida,
+  máximo 100 mensajes) y se envía solo a los integrantes de ese equipo. Cada jugador recibe en
+  `room:state` únicamente el historial de su equipo; rivales, espectadores y otras partidas nunca lo
+  reciben. Un `clientId` por mensaje evita duplicados en reintentos. Pruebas: `server/test/teamchat.test.ts`.
+- **Sonido ambiente** en la mesa, bajito y con botón para silenciarlo (se recuerda la preferencia).
 - Al terminar, el anfitrión vuelve a la sala para la revancha.
 
 ### Por qué no hay base de datos (todavía)

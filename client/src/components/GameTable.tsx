@@ -5,6 +5,8 @@ import { leaveRoom, rematch, sendAction, sit, useStore } from '../store';
 import { CALL_TEXT, actionLabel, pendingText, teamName } from '../texts';
 import { SpanishCard } from './Card';
 import { ChatPanel } from './Chat';
+import { BarTableSurface, BeerSet, CardDeck } from './BarTable';
+import { setMuted, useAmbientSound, useMuted } from '../ambient';
 import { RulesSummary } from './Rules';
 import { ScoreBoard } from './Score';
 
@@ -292,20 +294,36 @@ function TableStage({ room, g, seats, fraction, secsLeft }: { room: RoomView; g:
 
   const result = g.phase === 'handOver' ? g.result : null;
 
+  // Objetos decorativos en ángulos donde no hay jugadores (arriba a la derecha y a la izquierda).
+  const free = n === 6 ? [-62, -118] : [-45, -135];
+  const propRadius = n === 6 ? 0.9 : 0.8;
+  const props = compact && n === 6 ? [] : [
+    { angle: (free[0] * Math.PI) / 180, kind: 'beer' as const },
+    { angle: (free[1] * Math.PI) / 180, kind: 'deck' as const },
+  ];
+  const propSize = Math.round(clamp(Math.min(tw, th * 1.6) * (n === 6 ? 0.036 : 0.048), 20, 46));
+
   return (
     <div ref={ref} className="relative min-h-0 flex-1">
       {tw > 0 && (
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: tw, height: th }}>
-          {/* Borde de madera y paño */}
-          <div className="wood absolute inset-0 rounded-[50%]" style={{ padding: rim }}>
-            <div className="wood-inlay h-full w-full rounded-[50%] p-[2px]">
-              <div className="felt h-full w-full rounded-[50%]" />
+          {/* Mesa de madera */}
+          <BarTableSurface edge={Math.round(clamp(th * 0.03, 6, 16))} />
+
+          {/* La cerveza con los vasos y el mazo, en los huecos entre jugadores */}
+          {props.map(({ angle, kind }) => (
+            <div
+              key={kind}
+              className="absolute -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${(0.5 + Math.cos(angle) * Rx * propRadius) * 100}%`, top: `${(0.5 + Math.sin(angle) * Ry * propRadius) * 100}%` }}
+            >
+              {kind === 'beer' ? <BeerSet size={propSize} /> : <CardDeck size={propSize} />}
             </div>
-          </div>
+          ))}
 
           {/* Centro: valor de la mano y bazas (en pantallas chicas se muestra en la zona inferior) */}
           {!compact && (
-            <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2">
+            <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2 rounded-[var(--radius-lg)] bg-ink-950/55 px-4 py-2.5 shadow-[var(--shadow-soft)] backdrop-blur-[2px]">
               <span className="label text-ivory/55">
                 Mano {g.handNumber} · vale {g.truco.level}
               </span>
@@ -550,11 +568,24 @@ export function GameTable({ room }: { room: RoomView }) {
   const fraction = deadlineAt && g.rules.turnTimeSec ? clamp((deadlineAt - now) / (g.rules.turnTimeSec * 1000), 0, 1) : null;
   const lastChatId = room.chat.length ? room.chat[room.chat.length - 1].id : 0;
   const [seenChat, setSeenChat] = useState(lastChatId);
-  const newChat = !docked && !drawerOpen && room.chat.some((m) => m.id > seenChat && !m.system && m.playerId !== room.me.id);
+  const teamMsgs = room.teamChat ?? [];
+  const lastTeamId = teamMsgs.length ? teamMsgs[teamMsgs.length - 1].id : '';
+  const [seenTeam, setSeenTeam] = useState(lastTeamId);
+  const seenTeamIdx = teamMsgs.findIndex((m) => m.id === seenTeam);
+  const newChat =
+    !docked &&
+    !drawerOpen &&
+    (room.chat.some((m) => m.id > seenChat && !m.system && m.playerId !== room.me.id) ||
+      teamMsgs.slice(seenTeamIdx + 1).some((m) => m.senderId !== room.me.id));
+  const muted = useMuted();
+  useAmbientSound();
 
   useEffect(() => {
-    if (drawerOpen || docked) setSeenChat(lastChatId);
-  }, [drawerOpen, docked, lastChatId]);
+    if (drawerOpen || docked) {
+      setSeenChat(lastChatId);
+      setSeenTeam(lastTeamId);
+    }
+  }, [drawerOpen, docked, lastChatId, lastTeamId]);
 
   const activeSeats = useMemo(() => {
     if (g.phase !== 'playing') return [] as number[];
@@ -614,6 +645,18 @@ export function GameTable({ room }: { room: RoomView }) {
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
               <path d="M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3V4z" />
               <path d="M5 17a3 3 0 013-3h11M9 8h6" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setMuted(!muted)}
+            className="icon-btn"
+            aria-label={muted ? 'Activar el sonido de fondo' : 'Silenciar el sonido de fondo'}
+            aria-pressed={!muted}
+            title={muted ? 'Activar sonido' : 'Silenciar'}
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M4 9v6h4l5 4V5L8 9H4z" />
+              {muted ? <path d="M17 9l5 6M22 9l-5 6" /> : <path d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12" />}
             </svg>
           </button>
           <div className="hidden min-w-0 flex-1 md:block">

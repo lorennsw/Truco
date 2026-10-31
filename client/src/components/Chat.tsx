@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cardLabel } from '@truco/shared';
-import type { CallName, GameEvent, RoomView, Team } from '@truco/shared';
-import { sendChat } from '../store';
+import { TEAM_CHAT_MAX_LENGTH } from '@truco/shared';
+import type { CallName, GameEvent, RoomView, Team, TeamChatMessage } from '@truco/shared';
+import { sendChat, sendTeamChat } from '../store';
 import { CALL_TEXT, SCORE_REASON, teamName } from '../texts';
 import { SuitIcon } from './Card';
 
@@ -108,31 +109,183 @@ function LogEntry({ e, name, mySeat }: { e: GameEvent; name: (s: number) => stri
   }
 }
 
-export function ChatPanel({ room, showLog = false, className = '' }: { room: RoomView; showLog?: boolean; className?: string }) {
-  const [tab, setTab] = useState<'chat' | 'log'>(showLog ? 'log' : 'chat');
+const hhmm = (at: number) => new Date(at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+
+/** Mantiene el scroll al final cuando llegan mensajes, salvo que el usuario esté leyendo más arriba. */
+function useStickyScroll(dep: unknown, active: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 140) el.scrollTop = el.scrollHeight;
+  }, [dep]);
+  useEffect(() => {
+    const el = ref.current;
+    if (active && el) el.scrollTop = el.scrollHeight;
+  }, [active]);
+  return ref;
+}
+
+/** Chat privado del equipo: solo lo reciben los compañeros (lo garantiza el servidor). */
+function TeamChatView({ room, messages }: { room: RoomView; messages: TeamChatMessage[] }) {
   const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const listRef = useStickyScroll(messages.length, true);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const myTeam = room.me.seat !== null ? ((room.me.seat % 2) as Team) : 0;
+  const mates = room.seats.filter((s) => s.team === myTeam && s.index !== room.me.seat && s.player).map((s) => s.player!.name);
+  const canSend = room.status === 'playing';
+
+  // El campo crece con el texto (hasta un máximo).
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 112)}px`;
+  }, [text]);
+
+  const submit = async () => {
+    const t = text.trim();
+    if (!t || sending) return;
+    setSending(true);
+    const res = await sendTeamChat(t);
+    setSending(false);
+    if (res.ok) setText('');
+    inputRef.current?.focus();
+  };
+
+  return (
+    <>
+      <div className="flex items-center gap-2 border-b hairline px-4 pb-2 text-[12px] text-ivory/55">
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+          <rect x="5" y="11" width="14" height="9" rx="2" />
+          <path d="M8 11V8a4 4 0 018 0v3" />
+        </svg>
+        <span className="truncate">
+          Solo lo ven {mates.length ? <b className="font-semibold text-ivory/80">vos y {mates.join(', ')}</b> : 'vos y tu equipo'}
+        </span>
+      </div>
+      <div ref={listRef} className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-3" aria-live="polite">
+        {messages.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 py-8 text-center">
+            <span className={`flex h-10 w-10 items-center justify-center rounded-full ${myTeam === 0 ? 'bg-team0/15 text-team0' : 'bg-team1/15 text-team1'}`}>
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M4 5h16v11H8l-4 4V5z" />
+              </svg>
+            </span>
+            <p className="text-sm font-semibold text-ivory/75">Coordiná tu estrategia con tu equipo</p>
+            <p className="max-w-[16rem] text-[12px] text-ivory/45">Los rivales no pueden ver estos mensajes.</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {messages.map((m, i) => {
+              const mine = m.senderId === room.me.id;
+              const grouped = i > 0 && messages[i - 1].senderId === m.senderId && m.at - messages[i - 1].at < 120000;
+              return (
+                <div key={m.id} className={`anim-pop flex items-end gap-2 ${mine ? 'flex-row-reverse' : ''} ${grouped ? '-mt-1.5' : ''}`}>
+                  {!mine && (
+                    <span
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ring-1 ${
+                        m.team === 0 ? 'bg-team0/20 text-team0 ring-team0/50' : 'bg-team1/20 text-team1 ring-team1/50'
+                      } ${grouped ? 'invisible' : ''}`}
+                      aria-hidden
+                    >
+                      {m.senderName[0]?.toUpperCase()}
+                    </span>
+                  )}
+                  <div className={`flex max-w-[80%] flex-col ${mine ? 'items-end' : 'items-start'}`}>
+                    {!grouped && (
+                      <span className="mb-0.5 flex items-baseline gap-1.5 px-1 text-[11px]">
+                        <span className={`font-semibold ${mine ? 'text-ivory/70' : m.team === 0 ? 'text-team0' : 'text-team1'}`}>{mine ? 'Vos' : m.senderName}</span>
+                        <span className="text-ivory/35 tabular-nums">{hhmm(m.at)}</span>
+                      </span>
+                    )}
+                    <span
+                      className={`whitespace-pre-wrap break-words rounded-2xl px-3 py-1.5 text-[13.5px] leading-snug ${
+                        mine ? 'rounded-br-md bg-jade-strong/30 text-ivory' : 'rounded-bl-md bg-ivory/[0.07] text-ivory/90'
+                      }`}
+                    >
+                      {m.text}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <form
+        className="border-t hairline p-2.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <div className="flex items-end gap-2">
+          <textarea
+            ref={inputRef}
+            rows={1}
+            value={text}
+            disabled={!canSend}
+            maxLength={TEAM_CHAT_MAX_LENGTH}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter envía; Shift + Enter hace un salto de línea.
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            placeholder={canSend ? 'Mensaje para tu equipo…' : 'La partida terminó'}
+            aria-label="Mensaje para tu equipo"
+            className="max-h-28 min-h-10 min-w-0 flex-1 resize-none rounded-[var(--radius-md)] border border-ivory/10 bg-ink-950/60 px-3 py-2 text-sm leading-snug outline-none transition placeholder:text-ivory/35 focus:border-jade/60 disabled:opacity-50"
+          />
+          <button disabled={!text.trim() || sending || !canSend} className="btn btn-primary btn-sm h-10">
+            Enviar
+          </button>
+        </div>
+        <div className="mt-1 flex justify-between px-1 text-[10.5px] text-ivory/35">
+          <span>Enter para enviar · Shift + Enter, nueva línea</span>
+          {text.length > TEAM_CHAT_MAX_LENGTH * 0.8 && (
+            <span className="tabular-nums">
+              {text.length}/{TEAM_CHAT_MAX_LENGTH}
+            </span>
+          )}
+        </div>
+      </form>
+    </>
+  );
+}
+
+type Tab = 'log' | 'chat' | 'team';
+
+export function ChatPanel({ room, showLog = false, className = '' }: { room: RoomView; showLog?: boolean; className?: string }) {
+  const hasTeam = showLog && room.mode > 1 && room.teamChat !== null;
+  const [tab, setTab] = useState<Tab>(showLog ? 'log' : 'chat');
+  const [text, setText] = useState('');
+  const teamMessages = room.teamChat ?? [];
   const lastChatId = room.chat.length ? room.chat[room.chat.length - 1].id : 0;
+  const lastTeamId = teamMessages.length ? teamMessages[teamMessages.length - 1].id : '';
   const [seenChat, setSeenChat] = useState(lastChatId);
-  const listRef = useRef<HTMLDivElement>(null);
+  const [seenTeam, setSeenTeam] = useState(lastTeamId);
   const name = (seat: number) => room.seats[seat]?.player?.name ?? `Lugar ${seat + 1}`;
   const events = useMemo(() => (room.game?.events ?? []).filter((e) => e.kind !== 'handEnd'), [room.game?.events]);
   const seatOf = useMemo(() => new Map(room.members.map((m) => [m.id, m.seat])), [room.members]);
-  const unread = tab === 'log' ? room.chat.filter((m) => m.id > seenChat && !m.system && m.playerId !== room.me.id).length : 0;
+  const listRef = useStickyScroll(`${tab}:${room.chat.length}:${events.length}`, true);
+
+  const unreadChat = tab !== 'chat' ? room.chat.filter((m) => m.id > seenChat && !m.system && m.playerId !== room.me.id).length : 0;
+  const seenTeamIndex = teamMessages.findIndex((m) => m.id === seenTeam);
+  const unreadTeam = tab !== 'team' ? teamMessages.slice(seenTeamIndex + 1).filter((m) => m.senderId !== room.me.id).length : 0;
 
   useEffect(() => {
     if (tab === 'chat') setSeenChat(lastChatId);
   }, [tab, lastChatId]);
-
-  // Mantener el scroll abajo solo si el usuario ya estaba cerca del final.
   useEffect(() => {
-    const el = listRef.current;
-    if (!el) return;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 140) el.scrollTop = el.scrollHeight;
-  }, [room.chat.length, events.length, tab]);
+    if (tab === 'team') setSeenTeam(lastTeamId);
+  }, [tab, lastTeamId]);
+  // Si la pestaña EQUIPO deja de corresponder (por ejemplo, al volver a la sala), se vuelve a JUGADAS.
   useEffect(() => {
-    const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [tab]);
+    if (tab === 'team' && !hasTeam) setTab('log');
+  }, [tab, hasTeam]);
 
   const submit = (t: string) => {
     if (!t.trim()) return;
@@ -140,25 +293,37 @@ export function ChatPanel({ room, showLog = false, className = '' }: { room: Roo
     setText('');
   };
 
+  const tabs: { id: Tab; label: string; unread: number }[] = [
+    { id: 'log', label: 'Jugadas', unread: 0 },
+    { id: 'chat', label: 'Chat', unread: unreadChat },
+    ...(hasTeam ? [{ id: 'team' as const, label: 'Equipo', unread: unreadTeam }] : []),
+  ];
+
   return (
     <div className={`panel flex min-h-0 flex-col overflow-hidden rounded-[var(--radius-xl)] ${className}`}>
       {showLog && (
         <div className="p-2">
-          <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-md)] bg-ink-950/60 p-1" role="tablist">
-            {(['log', 'chat'] as const).map((t) => (
+          <div className={`grid gap-1 rounded-[var(--radius-md)] bg-ink-950/60 p-1 ${tabs.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`} role="tablist">
+            {tabs.map((t) => (
               <button
-                key={t}
+                key={t.id}
                 role="tab"
-                aria-selected={tab === t}
-                onClick={() => setTab(t)}
-                className={`relative h-8 rounded-[9px] text-[12px] font-semibold uppercase tracking-wider transition ${
-                  tab === t ? 'bg-ivory/10 text-ivory shadow-sm' : 'text-ivory/50 hover:text-ivory/80'
+                aria-selected={tab === t.id}
+                onClick={() => setTab(t.id)}
+                className={`relative flex h-8 items-center justify-center gap-1.5 rounded-[9px] text-[12px] font-semibold uppercase tracking-wider transition ${
+                  tab === t.id ? 'bg-ivory/10 text-ivory shadow-sm' : 'text-ivory/50 hover:text-ivory/80'
                 }`}
               >
-                {t === 'log' ? 'Jugadas' : 'Chat'}
-                {t === 'chat' && unread > 0 && (
-                  <span className="absolute right-3 top-1/2 flex h-4 min-w-4 -translate-y-1/2 items-center justify-center rounded-full bg-jade px-1 text-[10px] font-bold text-ink-950">
-                    {unread}
+                {t.id === 'team' && (
+                  <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+                    <rect x="5" y="11" width="14" height="9" rx="2" />
+                    <path d="M8 11V8a4 4 0 018 0v3" />
+                  </svg>
+                )}
+                {t.label}
+                {t.unread > 0 && (
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-jade px-1 text-[10px] font-bold text-ink-950" aria-label={`${t.unread} sin leer`}>
+                    {t.unread > 9 ? '9+' : t.unread}
                   </span>
                 )}
               </button>
@@ -167,71 +332,77 @@ export function ChatPanel({ room, showLog = false, className = '' }: { room: Roo
         </div>
       )}
 
-      <div ref={listRef} className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 pb-3 pt-1" aria-live="polite">
-        {tab === 'log' ? (
-          events.length ? (
-            events.map((e) => <LogEntry key={e.id} e={e} name={name} mySeat={room.me.seat} />)
-          ) : (
-            <p className="py-8 text-center text-sm text-ivory/40">Todavía no hay jugadas.</p>
-          )
-        ) : (
-          <div className="flex flex-col gap-2 pt-2">
-            {room.chat.map((m) => {
-              if (m.system)
-                return (
-                  <div key={m.id} className="py-0.5 text-center text-[11px] text-ivory/40">
-                    {m.text}
-                  </div>
-                );
-              const mine = m.playerId === room.me.id;
-              const seat = m.playerId ? seatOf.get(m.playerId) : null;
-              const tone = seat == null ? 'text-ivory/70' : teamText((seat % 2) as Team);
-              return (
-                <div key={m.id} className={`flex max-w-[88%] flex-col ${mine ? 'items-end self-end' : 'items-start'}`}>
-                  {!mine && <span className={`mb-0.5 px-1 text-[11px] font-semibold ${tone}`}>{m.name}</span>}
-                  <span
-                    className={`break-words rounded-2xl px-3 py-1.5 text-[13.5px] leading-snug ${
-                      mine ? 'rounded-br-md bg-jade-strong/30 text-ivory' : 'rounded-bl-md bg-ivory/[0.07] text-ivory/90'
-                    }`}
-                  >
-                    {m.text}
-                  </span>
-                </div>
-              );
-            })}
+      {tab === 'team' && hasTeam ? (
+        <TeamChatView room={room} messages={teamMessages} />
+      ) : (
+        <>
+          <div ref={listRef} className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 pb-3 pt-1" aria-live="polite">
+            {tab === 'log' ? (
+              events.length ? (
+                events.map((e) => <LogEntry key={e.id} e={e} name={name} mySeat={room.me.seat} />)
+              ) : (
+                <p className="py-8 text-center text-sm text-ivory/40">Todavía no hay jugadas.</p>
+              )
+            ) : (
+              <div className="flex flex-col gap-2 pt-2">
+                {room.chat.map((m) => {
+                  if (m.system)
+                    return (
+                      <div key={m.id} className="py-0.5 text-center text-[11px] text-ivory/40">
+                        {m.text}
+                      </div>
+                    );
+                  const mine = m.playerId === room.me.id;
+                  const seat = m.playerId ? seatOf.get(m.playerId) : null;
+                  const tone = seat == null ? 'text-ivory/70' : teamText((seat % 2) as Team);
+                  return (
+                    <div key={m.id} className={`flex max-w-[88%] flex-col ${mine ? 'items-end self-end' : 'items-start'}`}>
+                      {!mine && <span className={`mb-0.5 px-1 text-[11px] font-semibold ${tone}`}>{m.name}</span>}
+                      <span
+                        className={`break-words rounded-2xl px-3 py-1.5 text-[13.5px] leading-snug ${
+                          mine ? 'rounded-br-md bg-jade-strong/30 text-ivory' : 'rounded-bl-md bg-ivory/[0.07] text-ivory/90'
+                        }`}
+                      >
+                        {m.text}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {tab === 'chat' && (
-        <div className="border-t hairline p-2.5">
-          <div className="scrollbar-thin mb-2 flex gap-1.5 overflow-x-auto pb-0.5">
-            {QUICK.map((q) => (
-              <button key={q} onClick={() => submit(q)} className="h-7 shrink-0 rounded-full border border-ivory/10 px-2.5 text-[12px] text-ivory/75 transition hover:border-ivory/25 hover:text-ivory">
-                {q}
-              </button>
-            ))}
-          </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              submit(text);
-            }}
-            className="flex gap-2"
-          >
-            <input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              maxLength={280}
-              placeholder="Escribí un mensaje…"
-              aria-label="Mensaje"
-              className="h-10 min-w-0 flex-1 rounded-[var(--radius-md)] border border-ivory/10 bg-ink-950/60 px-3 text-sm outline-none transition placeholder:text-ivory/35 focus:border-jade/60"
-            />
-            <button disabled={!text.trim()} className="btn btn-primary btn-sm h-10">
-              Enviar
-            </button>
-          </form>
-        </div>
+          {tab === 'chat' && (
+            <div className="border-t hairline p-2.5">
+              <div className="scrollbar-thin mb-2 flex gap-1.5 overflow-x-auto pb-0.5">
+                {QUICK.map((q) => (
+                  <button key={q} onClick={() => submit(q)} className="h-7 shrink-0 rounded-full border border-ivory/10 px-2.5 text-[12px] text-ivory/75 transition hover:border-ivory/25 hover:text-ivory">
+                    {q}
+                  </button>
+                ))}
+              </div>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  submit(text);
+                }}
+                className="flex gap-2"
+              >
+                <input
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  maxLength={280}
+                  placeholder="Escribí un mensaje…"
+                  aria-label="Mensaje"
+                  className="h-10 min-w-0 flex-1 rounded-[var(--radius-md)] border border-ivory/10 bg-ink-950/60 px-3 text-sm outline-none transition placeholder:text-ivory/35 focus:border-jade/60"
+                />
+                <button disabled={!text.trim()} className="btn btn-primary btn-sm h-10">
+                  Enviar
+                </button>
+              </form>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
