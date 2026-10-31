@@ -1,0 +1,12 @@
+# Despliegue en Render (un solo servicio web: API en tiempo real + cliente).
+services:
+  - type: web
+    name: truco-argentino
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"

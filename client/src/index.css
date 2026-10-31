@@ -1,0 +1,153 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Playfair Display', Georgia, serif;
+  --color-felt-950: #04170f;
+  --color-felt-900: #082a1c;
+  --color-felt-800: #0b3d2a;
+  --color-felt-700: #0f5138;
+  --color-felt-600: #146a49;
+  --color-cream: #fdf8ec;
+  --color-gold: #e3b341;
+  --color-team0: #38bdf8;
+  --color-team1: #fb7185;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(ellipse at top, #0f5138 0%, #082a1c 55%, #04170f 100%) fixed;
+  color: #ecfdf5;
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+.felt {
+  background:
+    radial-gradient(ellipse at center, rgba(255, 255, 255, 0.08), transparent 60%),
+    repeating-radial-gradient(circle at 30% 30%, rgba(0, 0, 0, 0.035) 0 2px, transparent 2px 4px),
+    radial-gradient(ellipse at center, #17784f 0%, #0f5c3c 55%, #0a4029 100%);
+}
+
+.wood {
+  background: linear-gradient(145deg, #6b3f1d, #3d220e 45%, #5a3416);
+  box-shadow:
+    inset 0 2px 4px rgba(255, 220, 170, 0.25),
+    0 30px 60px rgba(0, 0, 0, 0.55);
+}
+
+.card-back {
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.12) 0 4px, transparent 4px 10px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 0 4px, transparent 4px 10px),
+    linear-gradient(135deg, #8d1c2b, #5c0f1b);
+}
+
+.panel {
+  background: rgba(4, 23, 15, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+@keyframes deal-in {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.85) rotate(-6deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.anim-deal {
+  animation: deal-in 0.35s ease-out both;
+}
+
+@keyframes drop-in {
+  from {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.anim-drop {
+  animation: drop-in 0.25s ease-out both;
+}
+
+@keyframes bubble {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 6px) scale(0.7);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1.08);
+  }
+  20% {
+    transform: translate(-50%, 0) scale(1);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.anim-bubble {
+  animation: bubble 2.8s ease-out both;
+}
+
+@keyframes pulse-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(227, 179, 65, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(227, 179, 65, 0);
+  }
+}
+.turn-glow {
+  animation: pulse-ring 1.4s ease-in-out infinite;
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.anim-pop {
+  animation: pop 0.2s ease-out both;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
