@@ -234,7 +234,7 @@ export function GameTable({ room }: { room: RoomView }) {
 
           {/* Cartas jugadas */}
           {room.seats.map((s) => {
-            const p = pos(s.index, n === 6 ? (wide ? 24 : 18) : 27);
+            const p = pos(s.index, (n === 6 ? (wide ? 24 : 18) : 27) - (s.index === viewSeat ? 6 : 0));
             const cards = g.tricks.map((t) => ({ t, play: t.plays.find((pl) => pl.seat === s.index) })).filter((x) => x.play);
             return (
               <div key={`played-${s.index}`} className="pointer-events-none absolute" style={{ left: `${p.x}%`, top: `${p.y}%` }}>
