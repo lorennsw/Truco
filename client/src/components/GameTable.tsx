@@ -643,7 +643,7 @@ function actionStyle(a: Action): { cls: string; accent?: string } {
   }
 }
 
-function ActionBar({ g, onAction }: { g: PlayerView; onAction: (a: Action) => void }) {
+function ActionBar({ g, onAction, align = 'center' }: { g: PlayerView; onAction: (a: Action) => void; align?: 'center' | 'start' }) {
   const [confirmMazo, setConfirmMazo] = useState(false);
   useEffect(() => {
     if (!confirmMazo) return;
@@ -669,7 +669,7 @@ function ActionBar({ g, onAction }: { g: PlayerView; onAction: (a: Action) => vo
     );
   };
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2">
+    <div className={`flex flex-wrap items-center gap-2 ${align === 'start' ? 'justify-start' : 'justify-center'}`}>
       {responses.map(button)}
       {responses.length > 0 && bets.length > 0 && <span className="mx-1 hidden h-6 w-px bg-ivory/15 sm:block" />}
       {bets.map(button)}
@@ -771,6 +771,8 @@ export function GameTable({ room }: { room: RoomView }) {
   const coarse = useMedia('(pointer: coarse)');
   const canHover = useMedia('(hover: hover) and (pointer: fine)');
   const dock = useDock(canHover);
+  // Con mouse y pantalla ancha, los botones van al costado de la mano: así la lupa de las cartas nunca los tapa.
+  const sideActions = useMedia('(hover: hover) and (pointer: fine) and (min-width: 900px)');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -910,29 +912,42 @@ export function GameTable({ room }: { room: RoomView }) {
         {/* Zona del jugador local: estado, acciones y cartas en filas separadas */}
         <section className="shrink-0 px-3 pb-[max(env(safe-area-inset-bottom),16px)] sm:px-4" aria-label="Tu zona">
           <div className="mx-auto flex max-w-5xl flex-col items-center gap-2.5">
-            <div className="flex min-h-11 w-full flex-wrap items-center justify-center gap-x-4 gap-y-2">
-              <div className="flex items-center gap-2 md:hidden">
-                <TrickDots g={g} size={20} />
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-ivory/50">vale {g.truco.level}</span>
-                {g.myEnvido !== null && <span className="text-[11px] font-semibold text-envido sm:hidden">· envido {g.myEnvido}</span>}
-                {g.myFlor !== null && <span className="text-[11px] font-semibold text-flor sm:hidden">· flor {g.myFlor}</span>}
+            {!(sideActions && me) && (
+              <div className="flex min-h-11 w-full flex-wrap items-center justify-center gap-x-4 gap-y-2">
+                <div className="flex items-center gap-2 md:hidden">
+                  <TrickDots g={g} size={20} />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-ivory/50">vale {g.truco.level}</span>
+                  {g.myEnvido !== null && <span className="text-[11px] font-semibold text-envido sm:hidden">· envido {g.myEnvido}</span>}
+                  {g.myFlor !== null && <span className="text-[11px] font-semibold text-flor sm:hidden">· flor {g.myFlor}</span>}
+                </div>
+                <StatusLine
+                  room={room}
+                  g={g}
+                  mustRespond={mustRespond}
+                  myTurn={myTurn}
+                  secsLeft={secsLeft}
+                  fraction={fraction}
+                  hint={coarse && selected ? 'Tocá de nuevo para jugarla' : null}
+                />
+                {mySeat !== null && <ActionBar g={g} onAction={onAction} />}
               </div>
-              <StatusLine
-                room={room}
-                g={g}
-                mustRespond={mustRespond}
-                myTurn={myTurn}
-                secsLeft={secsLeft}
-                fraction={fraction}
-                hint={coarse && selected ? 'Tocá de nuevo para jugarla' : null}
-              />
-              {mySeat !== null && <ActionBar g={g} onAction={onAction} />}
-            </div>
+            )}
 
             {me ? (
               <div className="grid w-full grid-cols-[1fr_auto_1fr] items-end gap-3">
-                {/* Cartel propio */}
-                <div className="relative flex justify-end">
+                {/* Cartel propio (y, con botones al costado, el estado arriba) */}
+                <div className={`relative flex justify-end ${sideActions ? 'flex-col items-end gap-3' : ''}`}>
+                  {sideActions && (
+                    <StatusLine
+                      room={room}
+                      g={g}
+                      mustRespond={mustRespond}
+                      myTurn={myTurn}
+                      secsLeft={secsLeft}
+                      fraction={fraction}
+                      hint={null}
+                    />
+                  )}
                   {me.bubble && <SpeechBubble bubble={me.bubble} dir="up" />}
                   <div className={`hidden items-center gap-2.5 rounded-full bg-ink-900/80 py-1.5 pl-1.5 pr-4 ring-1 sm:flex ${me.active ? 'ring-gold/70' : 'ring-ivory/10'}`}>
                     <Avatar seat={me.seat} size={36} active={me.active} fraction={fraction} />
@@ -991,8 +1006,9 @@ export function GameTable({ room }: { room: RoomView }) {
                   })}
                 </div>
 
-                {/* Tantos propios (en celular van en la fila de estado) */}
-                <div className="hidden flex-col items-start gap-1.5 sm:flex">
+                {/* Botones (al costado en pantallas anchas) y tantos propios (en celular van en la fila de estado) */}
+                <div className="hidden flex-col items-start gap-2.5 sm:flex">
+                  {sideActions && <ActionBar g={g} onAction={onAction} align="start" />}
                   {g.myEnvido !== null && (
                     <span className="whitespace-nowrap rounded-full bg-envido/12 px-2.5 py-1 text-[12px] font-semibold text-envido ring-1 ring-envido/25">
                       Envido <b className="tabular-nums">{g.myEnvido}</b>
