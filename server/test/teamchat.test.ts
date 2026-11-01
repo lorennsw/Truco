@@ -12,7 +12,7 @@ type Client = Socket<ServerToClient, ClientToServer> & {
 };
 
 let url = '';
-const server = createTrucoServer({ serveClient: false });
+const server = createTrucoServer({ serveClient: false, pace: 0.2 });
 const all: Client[] = [];
 
 beforeAll(async () => {

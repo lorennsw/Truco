@@ -24,6 +24,7 @@ import {
   createGame,
   getPlayerView,
   legalActions,
+  pendingBet,
   sanitizeRules,
   startNextHand,
   teamOf,
@@ -78,7 +79,7 @@ interface Room {
 
 const BOT_NAMES = ['Don Pepe', 'La Chola', 'El Tano', 'Doña Rosa', 'El Gringo', 'Coco', 'Pocho', 'Mirta', 'El Ruso', 'Tita'];
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const HAND_PAUSE_MS = 4000;
+const HAND_PAUSE_MS = 6500;
 // Límite de frecuencia del chat de equipo: como máximo 5 mensajes cada 5 segundos.
 const TEAM_CHAT_BURST = 5;
 const TEAM_CHAT_WINDOW_MS = 5000;
@@ -95,7 +96,8 @@ export class RoomManager {
   private lobbyDirty = false;
   private teamChatSent = new Map<string, number[]>();
 
-  constructor(private io: IO) {
+  /** Multiplicador de los tiempos de los bots y las pausas (1 = ritmo normal; las pruebas lo aceleran). */
+  constructor(private io: IO, private pace = 1) {
     setInterval(() => this.sweep(), 15000).unref();
   }
 
@@ -541,7 +543,7 @@ export class RoomManager {
         if (room.game?.phase !== 'handOver') return;
         room.game = startNextHand(room.game);
         this.update(room);
-      }, HAND_PAUSE_MS);
+      }, HAND_PAUSE_MS * this.pace);
       return;
     }
 
@@ -565,7 +567,11 @@ export class RoomManager {
       const bot = actors.find((s) => kind(s) === 'bot');
       if (bot !== undefined) {
         seat = bot;
-        delay = 900 + Math.random() * 900;
+        // Ritmo tranquilo: el bot "piensa" un poco más si tiene que responder un canto, y se deja ver
+        // quién ganó la baza antes de que arranque la siguiente.
+        const t = g.hand.tricks;
+        const trickJustEnded = t.length > 1 && t[t.length - 1].plays.length === 0;
+        delay = (1700 + Math.random() * 1300 + (pendingBet(g.hand) ? 900 : 0) + (trickJustEnded ? 1400 : 0)) * this.pace;
       } else {
         seat = actors[0];
         delay = g.rules.turnTimeSec ? Math.min(DISCONNECTED_ACT_MS, g.rules.turnTimeSec * 1000) : DISCONNECTED_ACT_MS;

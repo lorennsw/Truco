@@ -7,7 +7,7 @@ import { createTrucoServer } from '../src/app';
 type Client = Socket<ServerToClient, ClientToServer> & { last?: RoomView };
 
 let url = '';
-const server = createTrucoServer({ serveClient: false });
+const server = createTrucoServer({ serveClient: false, pace: 0.2 });
 const clients: Client[] = [];
 
 beforeAll(async () => {

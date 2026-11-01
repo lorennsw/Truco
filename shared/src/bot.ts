@@ -1,6 +1,8 @@
 // Jugador automático sencillo. Se usa para completar mesas con bots y para jugar
 // por un jugador desconectado o cuando vence el tiempo de la jugada.
 // Solo usa información que el jugador tendría: sus cartas y la mesa.
+// También miente: a veces canta envido o truco con mano floja, o se anima a recantar, y se va
+// al mazo de la mentira si le recantan fuerte.
 
 import { Card, cardRank, envidoPoints, florPoints, hasFlor } from './cards';
 import { Action, GameState, legalActions, pendingBet, teamOf } from './engine';
@@ -28,6 +30,9 @@ export function chooseBotAction(state: GameState, seat: number, rng: () => numbe
   const tricksLost = h.tricks.filter((t) => t.done && t.winnerTeam !== null && t.winnerTeam !== team).length;
   const power = strength(myCards) + tricksWon * 0.25 - tricksLost * 0.25;
   const bluff = rng() < 0.12;
+  // Cada bot tiene su carácter: unos mienten más que otros (fijo por asiento y mano para no ser predecible).
+  const nerve = 0.6 + (((seat * 7 + h.number * 3) % 5) / 4) * 0.8; // 0.6 a 1.4
+  const lie = (p: number) => rng() < p * nerve;
 
   const bet = pendingBet(h);
   if (bet === 'flor') {
@@ -43,6 +48,8 @@ export function chooseBotAction(state: GameState, seat: number, rng: () => numbe
     if (find(legal, 'flor')) return { type: 'flor' };
     if (envido >= 32 && find(legal, 'envido', 'real')) return { type: 'envido', kind: 'real' };
     if (envido >= 33 && find(legal, 'envido', 'falta')) return { type: 'envido', kind: 'falta' };
+    // Mentira: recanta con poco para que el rival se achique.
+    if (envido < 24 && find(legal, 'envido', 'real') && lie(0.07)) return { type: 'envido', kind: 'real' };
     return envido >= 27 || (envido >= 24 && bluff) ? { type: 'quiero' } : { type: 'noQuiero' };
   }
   if (bet === 'truco') {
@@ -50,6 +57,8 @@ export function chooseBotAction(state: GameState, seat: number, rng: () => numbe
     if (find(legal, 'envido', 'envido') && envido >= 27) return { type: 'envido', kind: envido >= 31 ? 'real' : 'envido' };
     const level = h.truco.pending!.level;
     if (power > 0.82 + level * 0.02 && find(legal, 'truco')) return { type: 'truco' };
+    // Mentira: recanta sin tener con qué (más probable si ya ganó una baza, menos cuanto más alto el canto).
+    if (find(legal, 'truco') && lie((tricksWon > 0 ? 0.12 : 0.06) / (level - 1))) return { type: 'truco' };
     if (power > 0.5 + level * 0.06 || bluff) return { type: 'quiero' };
     return { type: 'noQuiero' };
   }
@@ -59,8 +68,16 @@ export function chooseBotAction(state: GameState, seat: number, rng: () => numbe
   if (find(legal, 'envido', 'envido')) {
     if (envido >= 31 && rng() < 0.6) return { type: 'envido', kind: 'real' };
     if (envido >= 27 || (bluff && envido >= 23)) return { type: 'envido', kind: 'envido' };
+    // Mentira: canta envido con poco tanto.
+    if (envido < 23 && lie(0.1)) return { type: 'envido', kind: rng() < 0.3 ? 'real' : 'envido' };
   }
-  if (find(legal, 'truco') && (power > 0.85 || (bluff && rng() < 0.4)) && h.tricks.length > 1) return { type: 'truco' };
+  if (find(legal, 'truco')) {
+    if (power > 0.85 && h.tricks.length > 1) return { type: 'truco' };
+    // Mentira: canta truco con mano floja. En primera, antes de mostrar cartas, es más creíble.
+    const weak = power < 0.55;
+    if (weak && lie(h.tricks.length === 1 ? 0.08 : tricksWon > 0 ? 0.16 : 0.1)) return { type: 'truco' };
+    if (!weak && bluff && rng() < 0.4 && h.tricks.length > 1) return { type: 'truco' };
+  }
 
   const plays = myCards.filter((c) => find(legal, 'play') && legal.some((a) => a.type === 'play' && a.cardId === c.id));
   if (!plays.length) return legal[0];

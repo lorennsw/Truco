@@ -72,7 +72,7 @@ function useBubbles(events: GameEvent[]) {
     if (!add.length) return;
     setBubbles((b) => [...b.filter((x) => !add.some((a) => a.seat === x.seat)), ...add]);
     const keys = add.map((a) => a.key);
-    const t = setTimeout(() => setBubbles((b) => b.filter((x) => !keys.includes(x.key))), 2800);
+    const t = setTimeout(() => setBubbles((b) => b.filter((x) => !keys.includes(x.key))), 3600);
     return () => clearTimeout(t);
   }, [events]);
   return bubbles;
@@ -137,6 +137,30 @@ function SpeechBubble({ bubble, below }: { bubble: Bubble; below?: boolean }) {
 const ManoChip = ({ className = '' }: { className?: string }) => (
   <span className={`chip h-[18px] bg-gold px-1.5 text-[9px] text-ink-950 ${className}`}>Mano</span>
 );
+
+/**
+ * Efecto lupa como el dock de macOS: la carta bajo el mouse se agranda y las vecinas un poco menos.
+ * Es solo visual y local: no se envía nada al servidor, así que los demás no lo ven.
+ */
+function useDock(enabled: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scales, setScales] = useState<number[]>([]);
+  const onMouseMove = (e: React.MouseEvent) => {
+    const box = ref.current;
+    if (!enabled || !box) return;
+    const left = box.getBoundingClientRect().left;
+    const items = Array.from(box.children) as HTMLElement[];
+    setScales(
+      items.map((el) => {
+        const center = left + el.offsetLeft + el.offsetWidth / 2;
+        const d = Math.abs(e.clientX - center) / (el.offsetWidth * 1.4);
+        return d >= 1 ? 1 : 1 + 0.32 * (Math.cos(d * Math.PI) + 1) / 2;
+      }),
+    );
+  };
+  const onMouseLeave = () => setScales([]);
+  return { ref, scales, handlers: enabled ? { onMouseMove, onMouseLeave } : {} };
+}
 
 // ───────────────────────── Mesa ─────────────────────────
 
@@ -600,6 +624,8 @@ export function GameTable({ room }: { room: RoomView }) {
   const docked = useMedia('(min-width: 1100px)');
   const wideScore = useMedia('(min-width: 1280px), (min-width: 760px) and (max-width: 1099px)');
   const coarse = useMedia('(pointer: coarse)');
+  const canHover = useMedia('(hover: hover) and (pointer: fine)');
+  const dock = useDock(canHover);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -771,23 +797,30 @@ export function GameTable({ room }: { room: RoomView }) {
                 </div>
 
                 {/* Mano propia */}
-                <div className="flex items-end justify-center" style={{ minHeight: `calc(${HAND_CARD_W} * 1.5)` }}>
+                <div ref={dock.ref} {...dock.handlers} className={`relative flex items-end justify-center ${canHover ? 'dock' : ''}`} style={{ minHeight: `calc(${HAND_CARD_W} * 1.55)` }}>
                   {g.myHand.map((c, i) => {
                     const playable = g.legal.some((a) => a.type === 'play' && a.cardId === c.id);
                     const mid = (g.myHand.length - 1) / 2;
+                    const zoom = dock.scales[i] ?? 1;
                     return (
                       <div
                         key={`${g.handNumber}-${c.id}`}
                         className="-ml-2 first:ml-0 sm:ml-1 sm:first:ml-0"
-                        style={{ transform: `rotate(${(i - mid) * 4}deg) translateY(${Math.abs(i - mid) * 4}px)`, transformOrigin: 'bottom center' }}
+                        style={{ transform: `rotate(${(i - mid) * 4}deg) translateY(${Math.abs(i - mid) * 4}px)`, transformOrigin: 'bottom center', zIndex: Math.round(zoom * 10) }}
                       >
-                        <div className="anim-deal" style={{ animationDelay: `${i * 70}ms` }}>
-                          <SpanishCard
-                            card={c}
-                            state={!playable ? 'idle' : selected === c.id ? 'selected' : 'playable'}
-                            onClick={() => onCard(c.id)}
-                            style={{ width: HAND_CARD_W }}
-                          />
+                        {/* Lupa tipo dock: la carta crece desde abajo y corre a las vecinas */}
+                        <div
+                          style={{ transform: `scale(${zoom})`, transformOrigin: 'bottom center', marginInline: `calc(${HAND_CARD_W} * ${((zoom - 1) * 0.5).toFixed(3)})` }}
+                          className="transition-[transform,margin] duration-150 ease-out"
+                        >
+                          <div className="anim-deal" style={{ animationDelay: `${i * 140}ms` }}>
+                            <SpanishCard
+                              card={c}
+                              state={!playable ? 'idle' : selected === c.id ? 'selected' : 'playable'}
+                              onClick={() => onCard(c.id)}
+                              style={{ width: HAND_CARD_W }}
+                            />
+                          </div>
                         </div>
                       </div>
                     );

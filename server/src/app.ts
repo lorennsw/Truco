@@ -26,7 +26,7 @@ function findClientDist(): string | undefined {
   );
 }
 
-export function createTrucoServer({ serveClient = true } = {}) {
+export function createTrucoServer({ serveClient = true, pace = 1 } = {}) {
   // Orígenes permitidos para CORS (separados por coma). Por defecto, cualquiera.
   const origins = process.env.CLIENT_ORIGIN?.split(',').map((s) => s.trim()).filter(Boolean);
   const app = express();
@@ -36,7 +36,7 @@ export function createTrucoServer({ serveClient = true } = {}) {
     pingInterval: 10000,
     pingTimeout: 8000,
   });
-  const rooms = new RoomManager(io);
+  const rooms = new RoomManager(io, pace);
 
   app.get('/health', (_req, res) => {
     res.json({ ok: true });

@@ -169,6 +169,10 @@ body {
     translate: 0 -12%;
     box-shadow: var(--shadow-card-lift);
   }
+  /* En la mano con lupa, la carta ya crece: no hace falta además levantarla. */
+  .dock .scard-playable:hover:not(.scard-selected) {
+    translate: none;
+  }
 }
 .scard-playable:focus-visible {
   translate: 0 -12%;
@@ -328,7 +332,7 @@ body {
 }
 }
 
-/* ───────────────────────── Animaciones (breves y discretas) ───────────────────────── */
+/* ───────────────────────── Animaciones (tranquilas, para seguir el juego) ───────────────────────── */
 
 @keyframes deal-in {
   from {
@@ -341,7 +345,7 @@ body {
   }
 }
 .anim-deal {
-  animation: deal-in 380ms var(--ease-out) both;
+  animation: deal-in 620ms var(--ease-out) both;
 }
 
 @keyframes play-in {
@@ -355,7 +359,7 @@ body {
   }
 }
 .anim-drop {
-  animation: play-in 260ms var(--ease-out) both;
+  animation: play-in 480ms var(--ease-out) both;
 }
 
 @keyframes win-pulse {
@@ -370,7 +374,7 @@ body {
   }
 }
 .anim-win {
-  animation: win-pulse 520ms var(--ease-out) both;
+  animation: win-pulse 800ms var(--ease-out) both;
 }
 
 @keyframes bubble {
@@ -393,7 +397,7 @@ body {
   }
 }
 .anim-bubble {
-  animation: bubble 2.8s var(--ease-out) both;
+  animation: bubble 3.6s var(--ease-out) both;
 }
 
 @keyframes pop {
