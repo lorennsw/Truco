@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { MODE_LABEL } from '@truco/shared';
-import type { Action, GameEvent, PlayerView, RoomView, SeatView, Team } from '@truco/shared';
+import type { Action, ChatMessage, GameEvent, PlayerView, RoomView, SeatView, Team } from '@truco/shared';
 import { leaveRoom, rematch, sendAction, sit, useStore } from '../store';
 import { CALL_TEXT, actionLabel, pendingText, teamName } from '../texts';
 import { SpanishCard } from './Card';
@@ -49,32 +49,64 @@ function useSize<T extends HTMLElement>() {
   return [ref, size] as const;
 }
 
-interface Bubble { key: number; seat: number; text: string; tone: 'call' | 'tanto' }
+interface Bubble { key: number; seat: number; text: string | null; tone: 'call' | 'tanto' | 'say'; sub?: string }
 
-/** Globos de diálogo para los cantos recientes (solo eventos nuevos, no el historial). */
-function useBubbles(events: GameEvent[]) {
+/**
+ * Nubes de diálogo: los cantos recientes, los tantos y lo que dice cada jugador en el chat
+ * (los bots comentan sus jugadas). Solo lo nuevo, no el historial.
+ */
+function useBubbles(events: GameEvent[], chat: ChatMessage[], seatOf: (playerId: string | null) => number | null) {
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
-  const lastSeen = useRef<number | null>(null);
+  const lastEvent = useRef<number | null>(null);
+  const lastChat = useRef<number | null>(null);
+  const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+
+  const show = (b: Bubble, merge: boolean) => {
+    setBubbles((list) => {
+      const prev = list.find((x) => x.seat === b.seat);
+      // Si el jugador recién cantó, la frase va debajo del canto en la misma nube.
+      const next = merge && prev && prev.text ? { ...prev, sub: b.sub } : b;
+      return [...list.filter((x) => x.seat !== b.seat), next];
+    });
+    clearTimeout(timers.current.get(b.seat));
+    timers.current.set(
+      b.seat,
+      setTimeout(() => setBubbles((list) => list.filter((x) => x.seat !== b.seat)), b.sub ? 4600 : 3600),
+    );
+  };
+
   useEffect(() => {
     const maxId = events.length ? events[events.length - 1].id : 0;
-    if (lastSeen.current === null) {
-      lastSeen.current = maxId;
+    if (lastEvent.current === null) {
+      lastEvent.current = maxId;
       return;
     }
-    const fresh = events.filter((e) => e.id > lastSeen.current!);
-    lastSeen.current = maxId;
-    const add: Bubble[] = [];
+    const fresh = events.filter((e) => e.id > lastEvent.current!);
+    lastEvent.current = maxId;
     for (const e of fresh) {
-      if (e.kind === 'call') add.push({ key: e.id * 10, seat: e.seat, text: CALL_TEXT[e.call], tone: 'call' });
+      if (e.kind === 'call') show({ key: e.id * 10, seat: e.seat, text: CALL_TEXT[e.call], tone: 'call' }, false);
       if (e.kind === 'envidoResult' || e.kind === 'florResult')
-        e.reveals.forEach((r, i) => add.push({ key: e.id * 10 + i + 1, seat: r.seat, text: `${r.points}`, tone: 'tanto' }));
+        e.reveals.forEach((r, i) => show({ key: e.id * 10 + i + 1, seat: r.seat, text: `${r.points}`, tone: 'tanto' }, false));
     }
-    if (!add.length) return;
-    setBubbles((b) => [...b.filter((x) => !add.some((a) => a.seat === x.seat)), ...add]);
-    const keys = add.map((a) => a.key);
-    const t = setTimeout(() => setBubbles((b) => b.filter((x) => !keys.includes(x.key))), 3600);
-    return () => clearTimeout(t);
   }, [events]);
+
+  useEffect(() => {
+    const maxId = chat.length ? chat[chat.length - 1].id : 0;
+    if (lastChat.current === null) {
+      lastChat.current = maxId;
+      return;
+    }
+    const fresh = chat.filter((m) => m.id > lastChat.current! && !m.system);
+    lastChat.current = maxId;
+    for (const m of fresh) {
+      const seat = seatOf(m.playerId);
+      if (seat === null) continue;
+      const text = m.text.length > 90 ? `${m.text.slice(0, 88)}…` : m.text;
+      show({ key: -m.id, seat, text: null, tone: 'say', sub: text }, true);
+    }
+  }, [chat]);
+
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
   return bubbles;
 }
 
@@ -121,15 +153,54 @@ function Avatar({ seat, size, active, fraction }: { seat: SeatView; size: number
   );
 }
 
-function SpeechBubble({ bubble, below }: { bubble: Bubble; below?: boolean }) {
+export type BubbleDir = 'up' | 'down' | 'left' | 'right';
+/** En las puntas de la fila (celular) la nube se alinea hacia adentro para no salirse de la pantalla. */
+type BubbleAlign = 'center' | 'start' | 'end';
+const ALIGN_POS: Record<BubbleAlign, string> = { center: '', start: '!left-0 !translate-x-0', end: '!left-auto right-0 !translate-x-0' };
+const ALIGN_TAIL: Record<BubbleAlign, string> = { center: '', start: '!left-6', end: '!left-auto right-6 translate-x-1/2' };
+
+const BUBBLE_POS: Record<BubbleDir, string> = {
+  up: 'bottom-full left-1/2 mb-3 -translate-x-1/2 origin-bottom',
+  down: 'top-full left-1/2 mt-3 -translate-x-1/2 origin-top',
+  left: 'right-full top-1/2 mr-3 -translate-y-1/2 origin-right',
+  right: 'left-full top-1/2 ml-3 -translate-y-1/2 origin-left',
+};
+const TAIL_POS: Record<BubbleDir, string> = {
+  up: 'left-1/2 top-full -translate-x-1/2 -translate-y-1/2',
+  down: 'left-1/2 bottom-full -translate-x-1/2 translate-y-1/2',
+  left: 'left-full top-1/2 -translate-x-1/2 -translate-y-1/2',
+  right: 'right-full top-1/2 translate-x-1/2 -translate-y-1/2',
+};
+const BUBBLE_TONE: Record<Bubble['tone'], string> = {
+  call: 'bg-ivory text-ink-950',
+  tanto: 'bg-envido text-ink-950',
+  say: 'bg-ivory text-ink-950',
+};
+
+/** Nube de diálogo con colita que apunta a la foto del jugador. */
+function SpeechBubble({ bubble, dir = 'up', align = 'center' }: { bubble: Bubble; dir?: BubbleDir; align?: BubbleAlign }) {
   return (
     <div
       key={bubble.key}
-      className={`anim-bubble pointer-events-none absolute left-1/2 z-30 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-extrabold tracking-tight shadow-[var(--shadow-lift)] ${
-        below ? 'top-full mt-2' : 'bottom-full mb-2'
-      } ${bubble.tone === 'tanto' ? 'bg-envido text-ink-950' : 'bg-ivory text-ink-950'}`}
+      className={`anim-bubble pointer-events-none absolute z-30 w-max max-w-[200px] rounded-2xl px-3.5 py-2 text-center shadow-[var(--shadow-lift)] ${BUBBLE_POS[dir]} ${ALIGN_POS[align]} ${BUBBLE_TONE[bubble.tone]}`}
     >
-      {bubble.text}
+      <span className={`absolute h-3 w-3 rotate-45 rounded-[2px] ${TAIL_POS[dir]} ${ALIGN_TAIL[align]} ${bubble.tone === 'tanto' ? 'bg-envido' : 'bg-ivory'}`} aria-hidden />
+      {bubble.text && <span className="relative block whitespace-nowrap text-[16px] font-extrabold leading-tight tracking-tight">{bubble.text}</span>}
+      {bubble.sub && <span className={`relative block text-[12.5px] leading-snug ${bubble.text ? 'mt-0.5 text-ink-950/70' : 'font-medium'}`}>{bubble.sub}</span>}
+    </div>
+  );
+}
+
+/** Nube de "pensando…" para que se note a quién le toca. */
+function ThinkingBubble({ dir = 'up', align = 'center' }: { dir?: BubbleDir; align?: BubbleAlign }) {
+  return (
+    <div className={`anim-pop pointer-events-none absolute z-20 rounded-full bg-ivory px-2.5 py-1.5 shadow-[var(--shadow-soft)] ${BUBBLE_POS[dir]} ${ALIGN_POS[align]}`} aria-label="Pensando">
+      <span className={`absolute h-2.5 w-2.5 rotate-45 rounded-[2px] bg-ivory ${TAIL_POS[dir]} ${ALIGN_TAIL[align]}`} aria-hidden />
+      <span className="relative flex gap-1">
+        {[0, 1, 2].map((i) => (
+          <span key={i} className="thinking-dot h-1.5 w-1.5 rounded-full bg-ink-950/70" style={{ animationDelay: `${i * 160}ms` }} />
+        ))}
+      </span>
     </div>
   );
 }
@@ -180,7 +251,8 @@ function SeatPlate({
   compact,
   fraction,
   secsLeft,
-  below,
+  dir,
+  align = 'center',
   canTake,
 }: {
   info: SeatInfo;
@@ -188,13 +260,17 @@ function SeatPlate({
   compact: boolean;
   fraction: number | null;
   secsLeft: number | null;
-  below: boolean;
+  dir: BubbleDir;
+  align?: BubbleAlign;
   canTake: boolean;
 }) {
   const { seat, active, isMano, bubble, cardsLeft } = info;
   const p = seat.player;
   const relLabel = info.relation === 'compañero' ? 'Compañero' : info.relation === 'rival' ? 'Rival' : `Equipo ${seat.team + 1}`;
   const showTimer = active && secsLeft !== null;
+  // La nube sale de la foto hacia la mesa; si no dijo nada y es su turno, muestra que está pensando.
+  const cloud = bubble ? <SpeechBubble bubble={bubble} dir={dir} align={align} /> : active ? <ThinkingBubble dir={dir} align={align} /> : null;
+  const sideways = dir === 'left' || dir === 'right';
   const backs = (
     <span className="flex items-center" aria-label={`${cardsLeft} cartas en mano`}>
       {Array.from({ length: cardsLeft }, (_, i) => (
@@ -211,8 +287,9 @@ function SeatPlate({
   if (layout === 'stack' && !compact) {
     return (
       <div className="relative flex w-[124px] flex-col items-center gap-1.5">
-        {bubble && <SpeechBubble bubble={bubble} below={below} />}
+        {!sideways && cloud}
         <div className="relative">
+          {sideways && cloud}
           <Avatar seat={seat} size={46} active={active} fraction={fraction} />
           {isMano && <ManoChip className="absolute -right-5 -top-1.5 shadow-[var(--shadow-soft)]" />}
         </div>
@@ -232,8 +309,9 @@ function SeatPlate({
   if (compact) {
     return (
       <div className="relative flex w-[74px] flex-col items-center gap-1">
-        {bubble && <SpeechBubble bubble={bubble} below={below} />}
+        {!sideways && cloud}
         <div className="relative">
+          {sideways && cloud}
           <Avatar seat={seat} size={38} active={active} fraction={fraction} />
           {isMano && <ManoChip className="absolute -right-4 -top-1.5" />}
         </div>
@@ -249,7 +327,7 @@ function SeatPlate({
   }
   return (
     <div className="relative flex flex-col items-center">
-      {bubble && <SpeechBubble bubble={bubble} below={below} />}
+      {cloud}
       {isMano && <ManoChip className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2 shadow-[var(--shadow-soft)]" />}
       <div
         className={`flex h-[52px] w-[184px] items-center gap-2.5 rounded-full bg-ink-900/90 py-1.5 pl-1.5 pr-3 shadow-[var(--shadow-soft)] ring-1 transition ${
@@ -348,18 +426,19 @@ function TableStage({ room, g, seats, fraction, secsLeft }: { room: RoomView; g:
   /** Posición del cartel de un jugador (en px, relativa al centro de la mesa), siempre fuera de la madera. */
   const others = seats.filter((s) => s.seat.index !== mySeat);
   const rowSeats = others.filter((s) => Math.sin(angleOf(s.seat.index)) < 0.7).sort((x, y) => Math.cos(angleOf(x.seat.index)) - Math.cos(angleOf(y.seat.index)));
-  const placeOf = (seat: number): { x: number; y: number; layout: 'pill' | 'stack'; below: boolean } => {
+  const placeOf = (seat: number): { x: number; y: number; layout: 'pill' | 'stack'; dir: BubbleDir; align?: BubbleAlign } => {
     const a = angleOf(seat);
     const c = Math.cos(a);
     const sn = Math.sin(a);
-    if (sn >= 0.7) return { x: 0, y: th / 2 + gap + top.h / 2, layout: compact ? 'stack' : 'pill', below: false };
+    if (sn >= 0.7) return { x: 0, y: th / 2 + gap + top.h / 2, layout: compact ? 'stack' : 'pill', dir: 'up' };
     if (compact) {
       const i = rowSeats.findIndex((s) => s.seat.index === seat);
       const slot = Math.min(tw, box.w - pad * 2) / rowSeats.length;
-      return { x: (i - (rowSeats.length - 1) / 2) * slot, y: -th / 2 - gap - top.h / 2, layout: 'stack', below: true };
+      const align = rowSeats.length > 1 && i === 0 ? 'start' : rowSeats.length > 1 && i === rowSeats.length - 1 ? 'end' : 'center';
+      return { x: (i - (rowSeats.length - 1) / 2) * slot, y: -th / 2 - gap - top.h / 2, layout: 'stack', dir: 'down', align };
     }
-    if (hasSide && Math.abs(c) > 0.3) return { x: Math.sign(c) * (tw / 2 + gap + side.w / 2), y: Math.sign(sn) * Math.max(Math.abs(sn) * th * 0.3, (side.h + 12) / 2), layout: 'stack', below: sn < -0.2 };
-    return { x: c * tw * 0.3, y: -th / 2 - gap - top.h / 2 + 6, layout: 'pill', below: true };
+    if (hasSide && Math.abs(c) > 0.3) return { x: Math.sign(c) * (tw / 2 + gap + side.w / 2), y: Math.sign(sn) * Math.max(Math.abs(sn) * th * 0.3, (side.h + 12) / 2), layout: 'stack', dir: c > 0 ? 'left' : 'right' };
+    return { x: c * tw * 0.3, y: -th / 2 - gap - top.h / 2 + 6, layout: 'pill', dir: 'down' };
   };
 
   const result = g.phase === 'handOver' ? g.result : null;
@@ -447,7 +526,8 @@ function TableStage({ room, g, seats, fraction, secsLeft }: { room: RoomView; g:
                   compact={compact}
                   fraction={fraction}
                   secsLeft={secsLeft}
-                  below={at.below}
+                  dir={at.dir}
+                  align={at.align}
                   canTake={mySeat === null && !!info.seat.player?.isBot}
                 />
               </div>
@@ -629,7 +709,10 @@ export function GameTable({ room }: { room: RoomView }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
-  const bubbles = useBubbles(g.events);
+  const bubbles = useBubbles(g.events, room.chat, (id) => {
+    const i = room.seats.findIndex((x) => x.player?.id === id);
+    return i >= 0 ? i : null;
+  });
   const mySeat = room.me.seat;
   const myTeam: Team | null = mySeat !== null ? ((mySeat % 2) as Team) : null;
   const isHost = room.hostId === room.me.id;
@@ -781,7 +864,7 @@ export function GameTable({ room }: { room: RoomView }) {
               <div className="grid w-full grid-cols-[1fr_auto_1fr] items-end gap-3">
                 {/* Cartel propio */}
                 <div className="relative flex justify-end">
-                  {me.bubble && <SpeechBubble bubble={me.bubble} />}
+                  {me.bubble && <SpeechBubble bubble={me.bubble} dir="up" />}
                   <div className={`hidden items-center gap-2.5 rounded-full bg-ink-900/80 py-1.5 pl-1.5 pr-4 ring-1 sm:flex ${me.active ? 'ring-gold/70' : 'ring-ivory/10'}`}>
                     <Avatar seat={me.seat} size={36} active={me.active} fraction={fraction} />
                     <div className="flex flex-col leading-tight">

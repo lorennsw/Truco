@@ -380,16 +380,16 @@ body {
 @keyframes bubble {
   0% {
     opacity: 0;
-    transform: translate(-50%, 4px) scale(0.85);
+    scale: 0.6;
   }
-  10% {
+  8% {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1.04);
+    scale: 1.06;
   }
-  18% {
-    transform: translate(-50%, 0) scale(1);
+  14% {
+    scale: 1;
   }
-  86% {
+  88% {
     opacity: 1;
   }
   100% {
@@ -398,6 +398,25 @@ body {
 }
 .anim-bubble {
   animation: bubble 3.6s var(--ease-out) both;
+}
+.anim-bubble:has(> span + span + span) {
+  animation-duration: 4.6s;
+}
+
+@keyframes thinking {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    translate: 0 0;
+  }
+  30% {
+    opacity: 1;
+    translate: 0 -3px;
+  }
+}
+.thinking-dot {
+  animation: thinking 1.1s ease-in-out infinite;
 }
 
 @keyframes pop {

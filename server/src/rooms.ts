@@ -29,6 +29,7 @@ import {
   startNextHand,
   teamOf,
 } from '@truco/shared';
+import { botLine } from './botTalk';
 
 type IO = Server<ClientToServer, ServerToClient>;
 export type TrucoSocket = Socket<ClientToServer, ServerToClient>;
@@ -589,7 +590,13 @@ export class RoomManager {
     const action = chooseBotAction(g, seat);
     if (!action) return;
     const res = applyAction(g, seat, action);
-    if (res.ok) room.game = res.state;
+    if (res.ok) {
+      room.game = res.state;
+      // Los bots (no los humanos ausentes) a veces comentan lo que hacen.
+      const bot = room.members.get(room.seats[seat] ?? '');
+      const line = bot?.isBot ? botLine(g, seat, action) : null;
+      if (bot && line) this.pushChat(room, { playerId: bot.id, name: bot.name, text: line });
+    }
     this.update(room);
   }
 
