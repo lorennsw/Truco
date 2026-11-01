@@ -277,7 +277,7 @@ function TableStage({ room, g, seats, fraction, secsLeft }: { room: RoomView; g:
   const cardW = compact
     ? Math.round(clamp(tw * (n === 6 ? 0.11 : 0.125), 34, 54))
     : Math.round(clamp(Math.min(tw * (n === 6 ? 0.058 : 0.068), th * 0.15), 44, 104));
-  const cardH = cardW * 1.5;
+  const cardH = (cardW * 520) / 336;
   const step = Math.round(cardW * (compact ? 0.3 : 0.42));
   const fanHalfW = cardW / 2 + step;
   const Rx = 0.5 - (plate.hw + rim * 0.6) / tw;

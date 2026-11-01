@@ -134,13 +134,8 @@ body {
 }
 
 .card-back {
-  background:
-    radial-gradient(circle at 50% 50%, rgba(216, 181, 106, 0.45) 0 14%, transparent 15%),
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.07) 0 3px, transparent 3px 8px),
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.07) 0 3px, transparent 3px 8px),
-    linear-gradient(160deg, #7e2130, #521320);
-  border: 2px solid var(--color-cream);
-  box-shadow: inset 0 0 0 2px rgba(216, 181, 106, 0.4), var(--shadow-card);
+  background: url('/cartas/dorso.webp') center / 100% 100% no-repeat;
+  box-shadow: var(--shadow-card);
 }
 
 /* Dorso en miniatura, para indicar cuántas cartas le quedan a cada rival. */
@@ -155,41 +150,16 @@ body {
 
 /* ───────────────────────── Cartas ───────────────────────── */
 
-/* La carta se dimensiona solo por su ancho; todo lo interno es relativo (cqw / %). */
+/* La carta se dimensiona solo por su ancho; la imagen la llena con la proporción de la baraja. */
 .scard {
-  container-type: inline-size;
-  aspect-ratio: 2 / 3;
-  border-radius: 9% / 6%;
-  background: linear-gradient(170deg, #fffdf6 0%, #f7f0de 100%);
+  aspect-ratio: 336 / 520;
+  border-radius: 5.5% / 3.6%;
+  background: #fbf7ee;
   box-shadow: var(--shadow-card);
   transition:
     translate 160ms var(--ease-out),
     box-shadow 160ms var(--ease-out),
     filter 160ms ease;
-}
-.scard-frame {
-  position: absolute;
-  inset: 4.5%;
-  border-radius: 7% / 4.6%;
-  border: max(1px, 1.6cqw) solid currentColor;
-  opacity: 0.22;
-  pointer-events: none;
-}
-.scard-index {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1cqw;
-  font-weight: 800;
-  line-height: 0.9;
-  font-size: max(9px, 19cqw);
-  letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums;
-}
-.scard-index svg {
-  width: 14cqw;
-  height: 14cqw;
 }
 .scard-playable {
   cursor: pointer;

@@ -37,7 +37,8 @@ server/   Node.js + Express + Socket.IO
   test/             Pruebas de punta a punta con clientes Socket.IO reales
 client/   React + TypeScript + Vite + Tailwind CSS
   src/store.ts      Conexión, sesión persistente y estado global
-  src/components/   Inicio, sala de espera, mesa de juego, cartas SVG, puntaje con fósforos, chat
+  src/components/   Inicio, sala de espera, mesa de juego, cartas, puntaje con fósforos, chat
+  public/cartas/    Imágenes de la baraja (40 cartas + dorso, WebP)
 docs/REGLAS.md      Reglamento implementado y decisiones sobre variantes
 ```
 

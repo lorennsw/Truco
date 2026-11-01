@@ -30,8 +30,8 @@ function Deck({ w }: { w: number }) {
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className="card-back absolute left-1/2 top-1/2 rounded-[3px]"
-          style={{ width: w, height: w * 1.5, transform: `translate(-50%, -50%) rotate(${78 + i * 3}deg) translate(${-i * 1.5}px, ${-i * 1.5}px)` }}
+          className="card-back absolute left-1/2 top-1/2 rounded-[6%/4%]"
+          style={{ width: w, height: (w * 520) / 336, transform: `translate(-50%, -50%) rotate(${78 + i * 3}deg) translate(${-i * 1.5}px, ${-i * 1.5}px)` }}
         />
       ))}
     </div>
