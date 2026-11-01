@@ -233,6 +233,61 @@ function useDock(enabled: boolean) {
   return { ref, scales, handlers: enabled ? { onMouseMove, onMouseLeave } : {} };
 }
 
+/**
+ * Arrastrar una carta de la mano a la mesa para jugarla (mouse o dedo).
+ * Si se suelta sobre la mesa se juega; si no, vuelve a su lugar. Un toque o clic sin arrastrar sigue funcionando igual.
+ */
+function useCardDrag(onDrop: (cardId: string) => void) {
+  const [drag, setDrag] = useState<{ id: string; dx: number; dy: number; over: boolean } | null>(null);
+  const start = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null);
+  const justDragged = useRef(false);
+
+  const overTable = (x: number, y: number) => {
+    const mesa = document.querySelector('[data-mesa]')?.getBoundingClientRect();
+    return !!mesa && x >= mesa.left && x <= mesa.right && y >= mesa.top && y <= mesa.bottom;
+  };
+
+  const bind = (id: string, enabled: boolean) =>
+    enabled
+      ? {
+          onPointerDown: (e: React.PointerEvent) => {
+            if (e.button !== 0) return;
+            start.current = { id, x: e.clientX, y: e.clientY, moved: false };
+          },
+          onPointerMove: (e: React.PointerEvent) => {
+            const st = start.current;
+            if (!st || st.id !== id) return;
+            const dx = e.clientX - st.x;
+            const dy = e.clientY - st.y;
+            if (!st.moved && Math.hypot(dx, dy) < 8) return;
+            // Recién al empezar a arrastrar se captura el puntero, así un clic simple llega a la carta.
+            if (!st.moved) (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+            st.moved = true;
+            setDrag({ id, dx, dy, over: overTable(e.clientX, e.clientY) });
+          },
+          onPointerUp: (e: React.PointerEvent) => {
+            const st = start.current;
+            start.current = null;
+            if (!st?.moved) return;
+            justDragged.current = true;
+            setTimeout(() => (justDragged.current = false), 0);
+            setDrag(null);
+            if (overTable(e.clientX, e.clientY)) onDrop(id);
+          },
+          onPointerCancel: () => {
+            start.current = null;
+            setDrag(null);
+          },
+          // Después de arrastrar no cuenta como clic.
+          onClickCapture: (e: React.MouseEvent) => {
+            if (justDragged.current) e.stopPropagation();
+          },
+        }
+      : {};
+
+  return { drag, bind };
+}
+
 // ───────────────────────── Mesa ─────────────────────────
 
 interface SeatInfo {
@@ -380,7 +435,7 @@ function TrickDots({ g, size = 22 }: { g: PlayerView; size?: number }) {
 
 const LEVEL_NAME = ['', '', 'Truco', 'Retruco', 'Vale cuatro'];
 
-function TableStage({ room, g, seats, fraction, secsLeft }: { room: RoomView; g: PlayerView; seats: SeatInfo[]; fraction: number | null; secsLeft: number | null }) {
+function TableStage({ room, g, seats, fraction, secsLeft, dropHint = null }: { room: RoomView; g: PlayerView; seats: SeatInfo[]; fraction: number | null; secsLeft: number | null; dropHint?: 'near' | 'over' | null }) {
   const [ref, box] = useSize<HTMLDivElement>();
   const n = g.numPlayers;
   const mySeat = room.me.seat;
@@ -451,9 +506,19 @@ function TableStage({ room, g, seats, fraction, secsLeft }: { room: RoomView; g:
   return (
     <div ref={ref} className="relative min-h-0 flex-1 overflow-x-clip">
       {tw > 0 && (
-        <div className="absolute left-1/2 top-1/2" style={{ width: tw, height: th, transform: `translate(-50%, calc(-50% + ${offsetY}px))` }}>
+        <div data-mesa className="absolute left-1/2 top-1/2" style={{ width: tw, height: th, transform: `translate(-50%, calc(-50% + ${offsetY}px))` }}>
           {/* Mesa de madera */}
           <BarTableSurface edge={Math.round(clamp(th * 0.03, 6, 16))} />
+          {/* Al arrastrar una carta, la mesa se ilumina para indicar dónde soltarla */}
+          {dropHint && (
+            <div
+              className={`pointer-events-none absolute inset-[6%] z-20 flex items-start justify-center rounded-[50%] border-[3px] border-dashed pt-[7%] transition-colors duration-150 ${
+                dropHint === 'over' ? 'border-gold bg-gold/20' : 'border-ivory/40 bg-ivory/5'
+              }`}
+            >
+              <span className="rounded-full bg-ink-950/70 px-3 py-1 text-[13px] font-semibold text-ivory">{dropHint === 'over' ? 'Soltá para jugarla' : 'Arrastrala a la mesa'}</span>
+            </div>
+          )}
 
           {/* El mazo, en un hueco entre jugadores */}
           {props.map(({ angle, kind }) => (
@@ -777,6 +842,10 @@ export function GameTable({ room }: { room: RoomView }) {
     if (coarse && selected !== id) return setSelected(id);
     onAction({ type: 'play', cardId: id });
   };
+  const cardDrag = useCardDrag((id) => {
+    setSelected(null);
+    onAction({ type: 'play', cardId: id });
+  });
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -836,7 +905,7 @@ export function GameTable({ room }: { room: RoomView }) {
           </div>
         )}
 
-        <TableStage room={room} g={g} seats={seats} fraction={fraction} secsLeft={secsLeft} />
+        <TableStage room={room} g={g} seats={seats} fraction={fraction} secsLeft={secsLeft} dropHint={cardDrag.drag ? (cardDrag.drag.over ? 'over' : 'near') : null} />
 
         {/* Zona del jugador local: estado, acciones y cartas en filas separadas */}
         <section className="shrink-0 px-3 pb-[max(env(safe-area-inset-bottom),16px)] sm:px-4" aria-label="Tu zona">
@@ -884,12 +953,24 @@ export function GameTable({ room }: { room: RoomView }) {
                   {g.myHand.map((c, i) => {
                     const playable = g.legal.some((a) => a.type === 'play' && a.cardId === c.id);
                     const mid = (g.myHand.length - 1) / 2;
-                    const zoom = dock.scales[i] ?? 1;
+                    const dragging = cardDrag.drag?.id === c.id ? cardDrag.drag : null;
+                    const zoom = cardDrag.drag ? 1 : (dock.scales[i] ?? 1);
                     return (
                       <div
                         key={`${g.handNumber}-${c.id}`}
                         className="-ml-2 first:ml-0 sm:ml-1 sm:first:ml-0"
-                        style={{ transform: `rotate(${(i - mid) * 4}deg) translateY(${Math.abs(i - mid) * 4}px)`, transformOrigin: 'bottom center', zIndex: Math.round(zoom * 10) }}
+                        style={{
+                          transform: dragging
+                            ? `translate(${dragging.dx}px, ${dragging.dy}px) rotate(${dragging.dx * 0.03}deg) scale(1.05)`
+                            : `rotate(${(i - mid) * 4}deg) translateY(${Math.abs(i - mid) * 4}px)`,
+                          transformOrigin: 'bottom center',
+                          zIndex: dragging ? 60 : Math.round(zoom * 10),
+                          transition: dragging ? 'none' : 'transform 220ms var(--ease-out)',
+                          position: 'relative',
+                          cursor: dragging ? 'grabbing' : undefined,
+                          touchAction: playable ? 'none' : undefined,
+                        }}
+                        {...cardDrag.bind(c.id, playable)}
                       >
                         {/* Lupa tipo dock: la carta crece desde abajo y corre a las vecinas */}
                         <div
