@@ -152,6 +152,7 @@ interface SeatInfo {
 /** Cartel de un jugador sentado alrededor de la mesa. */
 function SeatPlate({
   info,
+  layout,
   compact,
   fraction,
   secsLeft,
@@ -159,6 +160,7 @@ function SeatPlate({
   canTake,
 }: {
   info: SeatInfo;
+  layout: 'pill' | 'stack';
   compact: boolean;
   fraction: number | null;
   secsLeft: number | null;
@@ -182,9 +184,30 @@ function SeatPlate({
     </button>
   );
 
+  if (layout === 'stack' && !compact) {
+    return (
+      <div className="relative flex w-[124px] flex-col items-center gap-1.5">
+        {bubble && <SpeechBubble bubble={bubble} below={below} />}
+        <div className="relative">
+          <Avatar seat={seat} size={46} active={active} fraction={fraction} />
+          {isMano && <ManoChip className="absolute -right-5 -top-1.5 shadow-[var(--shadow-soft)]" />}
+        </div>
+        <div className={`flex max-w-full flex-col items-center rounded-2xl bg-ink-900/90 px-3 py-1 leading-tight shadow-[var(--shadow-soft)] ring-1 transition ${active ? 'ring-gold/80' : 'ring-ivory/10'}`}>
+          <span className="max-w-[104px] truncate text-[13px] font-semibold">{p?.name ?? 'Libre'}</span>
+          <span className="flex items-center gap-1.5 text-[10.5px] text-ivory/50">
+            <span className={`h-1.5 w-1.5 rounded-full ${seat.team === 0 ? 'bg-team0' : 'bg-team1'}`} />
+            {p && !p.connected ? <span className="text-danger">Desconectado</span> : relLabel}
+            {showTimer && <b className="tabular-nums text-gold">{secsLeft}s</b>}
+          </span>
+        </div>
+        {cardsLeft > 0 && backs}
+        {take}
+      </div>
+    );
+  }
   if (compact) {
     return (
-      <div className="relative flex w-[84px] flex-col items-center gap-1">
+      <div className="relative flex w-[74px] flex-col items-center gap-1">
         {bubble && <SpeechBubble bubble={bubble} below={below} />}
         <div className="relative">
           <Avatar seat={seat} size={38} active={active} fraction={fraction} />
@@ -262,29 +285,35 @@ function TableStage({ room, g, seats, fraction, secsLeft }: { room: RoomView; g:
   const viewSeat = mySeat ?? 0;
   const myTeam: Team | null = mySeat !== null ? ((mySeat % 2) as Team) : null;
 
-  // Tamaño de la mesa: ocupa el espacio disponible con una proporción acotada (apaisada o vertical).
-  const pad = box.w < 640 ? 6 : 20;
-  const availW = Math.max(0, box.w - pad * 2);
-  const availH = Math.max(0, box.h - pad * 2);
-  const aspect = availH ? clamp(availW / availH, 0.7, 2.05) : 2;
+  // Los carteles de los jugadores van por fuera de la mesa: primero se reserva su lugar y la mesa ocupa el resto.
+  // En pantallas anchas, los de los costados van al costado (apilados) y los de arriba, arriba;
+  // en pantallas chicas, todos en una fila sobre la mesa.
+  const compact = box.w < 640;
+  const pad = compact ? 6 : 16;
+  const gap = compact ? 6 : 12;
+  const side = { w: 124, h: 118 };
+  const top = compact ? { w: 80, h: 90 } : { w: 184, h: 64 };
+  const spectator = mySeat === null;
+  const hasSide = !compact && n > 2;
+  const marginX = hasSide ? side.w + gap + pad : pad;
+  const marginTop = top.h + gap + pad;
+  const marginBottom = spectator ? top.h + gap + pad : pad;
+  const availW = Math.max(0, box.w - marginX * 2);
+  const availH = Math.max(0, box.h - marginTop - marginBottom);
+  const aspect = availH ? clamp(availW / availH, 0.75, 2.05) : 2;
   const tw = Math.min(availW, availH * aspect);
   const th = tw / aspect;
-  const compact = tw < 620;
-  const rim = clamp(tw * 0.022, 8, 18);
+  const offsetY = (marginTop - marginBottom) / 2;
 
-  // Medidas reales de los carteles y las cartas para calcular posiciones sin superposiciones.
-  const plate = compact ? { hw: 42, hh: 46 } : { hw: 92, hh: 26 };
   const cardW = compact
-    ? Math.round(clamp(tw * (n === 6 ? 0.11 : 0.125), 34, 54))
-    : Math.round(clamp(Math.min(tw * (n === 6 ? 0.058 : 0.068), th * 0.15), 44, 104));
+    ? Math.round(clamp(tw * (n === 6 ? 0.13 : 0.15), 34, 54))
+    : Math.round(clamp(Math.min(tw * (n === 6 ? 0.07 : 0.08), th * 0.17), 44, 104));
   const cardH = (cardW * 520) / 336;
   const step = Math.round(cardW * (compact ? 0.3 : 0.42));
   const fanHalfW = cardW / 2 + step;
-  const Rx = 0.5 - (plate.hw + rim * 0.6) / tw;
-  const Ry = 0.5 - (plate.hh + rim * 0.6) / th;
-  const gap = compact ? 6 : 12;
-  const Px = Math.max(0.1, Rx - (plate.hw + gap + fanHalfW) / tw);
-  const Py = Math.max(0.12, Ry - (plate.hh + gap + cardH / 2 + 4) / th);
+  // Radio (en fracción de la mesa) donde caen las cartas jugadas de cada jugador, dentro de la madera.
+  const Px = Math.max(0.12, 0.5 - (fanHalfW + tw * 0.07) / tw);
+  const Py = Math.max(0.14, 0.5 - (cardH / 2 + th * 0.08) / th);
 
   // Yo abajo; el siguiente en el orden de juego, a mi derecha.
   const angleOf = (seat: number) => {
@@ -292,26 +321,43 @@ function TableStage({ room, g, seats, fraction, secsLeft }: { room: RoomView; g:
     return ((90 - (r * 360) / n) * Math.PI) / 180;
   };
 
+  /** Posición del cartel de un jugador (en px, relativa al centro de la mesa), siempre fuera de la madera. */
+  const others = seats.filter((s) => s.seat.index !== mySeat);
+  const rowSeats = others.filter((s) => Math.sin(angleOf(s.seat.index)) < 0.7).sort((x, y) => Math.cos(angleOf(x.seat.index)) - Math.cos(angleOf(y.seat.index)));
+  const placeOf = (seat: number): { x: number; y: number; layout: 'pill' | 'stack'; below: boolean } => {
+    const a = angleOf(seat);
+    const c = Math.cos(a);
+    const sn = Math.sin(a);
+    if (sn >= 0.7) return { x: 0, y: th / 2 + gap + top.h / 2, layout: compact ? 'stack' : 'pill', below: false };
+    if (compact) {
+      const i = rowSeats.findIndex((s) => s.seat.index === seat);
+      const slot = Math.min(tw, box.w - pad * 2) / rowSeats.length;
+      return { x: (i - (rowSeats.length - 1) / 2) * slot, y: -th / 2 - gap - top.h / 2, layout: 'stack', below: true };
+    }
+    if (hasSide && Math.abs(c) > 0.3) return { x: Math.sign(c) * (tw / 2 + gap + side.w / 2), y: Math.sign(sn) * Math.max(Math.abs(sn) * th * 0.3, (side.h + 12) / 2), layout: 'stack', below: sn < -0.2 };
+    return { x: c * tw * 0.3, y: -th / 2 - gap - top.h / 2 + 6, layout: 'pill', below: true };
+  };
+
   const result = g.phase === 'handOver' ? g.result : null;
 
   // Mazo decorativo en un ángulo donde no hay jugadores (arriba a la izquierda).
-  const propRadius = n === 6 ? 0.9 : 0.8;
+  const propRadius = 0.78;
   const props = compact && n === 6 ? [] : [{ angle: ((n === 6 ? -118 : -135) * Math.PI) / 180, kind: 'deck' as const }];
   const propSize = Math.round(clamp(Math.min(tw, th * 1.6) * (n === 6 ? 0.036 : 0.048), 20, 46));
 
   return (
-    <div ref={ref} className="relative min-h-0 flex-1">
+    <div ref={ref} className="relative min-h-0 flex-1 overflow-x-clip">
       {tw > 0 && (
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: tw, height: th }}>
+        <div className="absolute left-1/2 top-1/2" style={{ width: tw, height: th, transform: `translate(-50%, calc(-50% + ${offsetY}px))` }}>
           {/* Mesa de madera */}
           <BarTableSurface edge={Math.round(clamp(th * 0.03, 6, 16))} />
 
-          {/* La cerveza con los vasos y el mazo, en los huecos entre jugadores */}
+          {/* El mazo, en un hueco entre jugadores */}
           {props.map(({ angle, kind }) => (
             <div
               key={kind}
               className="absolute -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${(0.5 + Math.cos(angle) * Rx * propRadius) * 100}%`, top: `${(0.5 + Math.sin(angle) * Ry * propRadius) * 100}%` }}
+              style={{ left: `${(0.5 + Math.cos(angle) * 0.5 * propRadius) * 100}%`, top: `${(0.5 + Math.sin(angle) * 0.5 * propRadius) * 100}%` }}
             >
               <CardDeck size={propSize} />
             </div>
@@ -363,25 +409,26 @@ function TableStage({ room, g, seats, fraction, secsLeft }: { room: RoomView; g:
           })}
 
           {/* Jugadores alrededor de la mesa (el jugador local tiene su zona abajo) */}
-          {seats
-            .filter((s) => s.seat.index !== mySeat)
-            .map((info) => {
-              const a = angleOf(info.seat.index);
-              const x = 0.5 + Math.cos(a) * Rx;
-              const y = 0.5 + Math.sin(a) * Ry;
-              return (
-                <div key={`seat-${info.seat.index}`} className="absolute z-10 -translate-x-1/2 -translate-y-1/2" style={{ left: `${x * 100}%`, top: `${y * 100}%` }}>
-                  <SeatPlate
-                    info={info}
-                    compact={compact}
-                    fraction={fraction}
-                    secsLeft={secsLeft}
-                    below={y < 0.3}
-                    canTake={mySeat === null && !!info.seat.player?.isBot}
-                  />
-                </div>
-              );
-            })}
+          {others.map((info) => {
+            const at = placeOf(info.seat.index);
+            return (
+              <div
+                key={`seat-${info.seat.index}`}
+                className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `calc(50% + ${at.x}px)`, top: `calc(50% + ${at.y}px)` }}
+              >
+                <SeatPlate
+                  info={info}
+                  layout={at.layout}
+                  compact={compact}
+                  fraction={fraction}
+                  secsLeft={secsLeft}
+                  below={at.below}
+                  canTake={mySeat === null && !!info.seat.player?.isBot}
+                />
+              </div>
+            );
+          })}
 
           {/* Resultado de la mano */}
           {result && (
