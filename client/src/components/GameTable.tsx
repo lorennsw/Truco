@@ -7,6 +7,7 @@ import { SpanishCard } from './Card';
 import { ChatPanel } from './Chat';
 import { BarTableSurface, CardDeck } from './BarTable';
 import { setMuted, useAmbientSound, useMuted } from '../ambient';
+import { useVoices } from '../voices';
 import { RulesSummary } from './Rules';
 import { ScoreBoard } from './Score';
 
@@ -776,6 +777,7 @@ export function GameTable({ room }: { room: RoomView }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  useVoices(g.events);
   const bubbles = useBubbles(g.events, room.chat, (id) => {
     const i = room.seats.findIndex((x) => x.player?.id === id);
     return i >= 0 ? i : null;
@@ -873,7 +875,7 @@ export function GameTable({ room }: { room: RoomView }) {
           <button
             onClick={() => setMuted(!muted)}
             className="icon-btn"
-            aria-label={muted ? 'Activar el sonido de fondo' : 'Silenciar el sonido de fondo'}
+            aria-label={muted ? 'Activar el sonido (ambiente y voces)' : 'Silenciar el sonido (ambiente y voces)'}
             aria-pressed={!muted}
             title={muted ? 'Activar sonido' : 'Silenciar'}
           >

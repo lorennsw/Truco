@@ -80,6 +80,9 @@ export function setMuted(value: boolean) {
   listeners.forEach((l) => l());
 }
 
+/** Para otros sonidos (las voces de los cantos): el mismo botón silencia todo. */
+export const isMuted = () => muted;
+
 export function useMuted() {
   return useSyncExternalStore(
     (l) => {

@@ -69,7 +69,7 @@ puro y determinista, así que se prueba sin red y lo comparten cliente y servido
   máximo 100 mensajes) y se envía solo a los integrantes de ese equipo. Cada jugador recibe en
   `room:state` únicamente el historial de su equipo; rivales, espectadores y otras partidas nunca lo
   reciben. Un `clientId` por mensaje evita duplicados en reintentos. Pruebas: `server/test/teamchat.test.ts`.
-- **Sonido ambiente** en la mesa, bajito y con botón para silenciarlo (se recuerda la preferencia).
+- **Sonido ambiente** en la mesa, bajito, y **voces en los cantos** (cuatro voces grabadas en `client/public/voces`, una por asiento: truco, retruco, vale cuatro, envidos, flor, quiero y los tantos). Un botón silencia todo y se recuerda la preferencia.
 - Al terminar, el anfitrión vuelve a la sala para la revancha.
 
 ### Por qué no hay base de datos (todavía)
